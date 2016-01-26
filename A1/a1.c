@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "a1.h"
+
 /* Linux Headers */
 /*
 #include <GL/gl.h>
@@ -59,11 +61,12 @@ void init (void)
 
 /* level is number of entries in the file, numits is the number of interations for each entry (column 3 on each
 	line in the file  */
-void drawObjects(int level, int numits) {
-GLfloat blue[]  = {0.0, 0.0, 1.0, 1.0};
-GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
-GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
-GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
+void drawObjects(int level, int numits)
+{
+    GLfloat blue[]  = {0.0, 0.0, 1.0, 1.0};
+    GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
+    GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
+    GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
 
 	/* example of drawing an object */
 	/* remove the code after this line and replace it with assignment code */
@@ -80,7 +83,8 @@ GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
 }
 
 
-void display (void) {
+void display (void)
+{
 
    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -164,10 +168,11 @@ void keyboard(unsigned char key, int x, int y)
 
 
 	/* read data file and store in arrays */
-void readFile(char **argv) {
-FILE *fp;
-char instr[1024];
-int count; 
+void readFile(char **argv)
+{
+    FILE *fp;
+    char instr[1024];
+    int count;
 
 	/* open file and print error message if name incorrect */
    if ((fp = fopen(argv[1], "r")) == NULL) {
@@ -175,7 +180,11 @@ int count;
       printf("Usage: %s <filename>\n", argv[0]);
       exit(1);
    }
-
+    
+    while(fgets(instr, 1024, fp) != NULL){
+        
+    };
+    
 	/* the code to read the input file goes here */
 	/* numlevels is set to the number of lines in the file not including the first comment line */
 
