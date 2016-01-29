@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include "a1.h"
 
 /* Linux Headers */
 /*
@@ -19,8 +18,47 @@
 #include <OpenGL/glu.h>
 #include <GLUT/glut.h>
 
+#define SHAPE_SPHERE    0
+#define SHAPE_CUBE      1
+#define SHAPE_TORUS     2
+#define SHAPE_CONE      3
+
+#define COLOUR_BLUE     0
+#define COLOUR_RED      1
+#define COLOUR_GREEN    2
+#define COLOUR_WHITE    3
+
+
+typedef struct ShapeInfo {
+    int shape;
+    int colour;
+    int iterations;
+    float size;
+    float inx;
+    float xoff;
+    float iny;
+    float yoff;
+    float inz;
+    float zoff;
+    float inxr;
+    float xroff;
+    float inyr;
+    float yroff;
+    float inzr;
+    float zroff;
+    float inxs;
+    float xsoff;
+    float inys;
+    float ysoff;
+    float inzs;
+    float zsoff;
+} ShapeInfo;
+
 	/* number of lines in the input file */
 int numberLevels;
+
+ShapeInfo** shapes = NULL;
+
 
 	/* flags used to control the appearance of the image */
 int lineDrawing = 1;	// draw polygons as solid or lines
@@ -62,27 +100,43 @@ void init (void)
 
 /* level is number of entries in the file, numits is the number of interations for each entry (column 3 on each
 	line in the file  */
-void drawObjects(int level, int numits)
+void drawObjects(int level, int numits, int curlevel, int curit)
 {
     GLfloat blue[]  = {0.0, 0.0, 1.0, 1.0};
     GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
     GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
     GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
-
-	/* example of drawing an object */
-	/* remove the code after this line and replace it with assignment code */
-	/* set colour of sphere */
-   glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, green);
-   glMaterialfv(GL_FRONT, GL_SPECULAR, white);
-	/* move to location for object then draw it */
-   glPushMatrix ();
-   glTranslatef (0.75, 0.0, -1.0); 
-
-   glutSolidSphere (1.0, 15, 15);
-   glPopMatrix ();
-
+    
+    //glPopMatrix(); //pop matrix
+    
+    
+    if(curlevel < level){ //down a level
+        //printf("draw: %d %d\n", curlevel, curit);
+        printf("Move\n");
+        printf("Push %d %d\n", curlevel, curit);
+        drawObjects(level, numits, curlevel+1, curit);
+        
+    }
+    else{
+        printf("Pop\n");
+        return; //up a level
+    }
+    if(curit < shapes[curlevel]->iterations){ //right a level
+        printf("Move\n");
+        printf("Push %d %d\n", curlevel, curit);
+        drawObjects(level,numits,curlevel, curit+1);
+    }
+    else{
+        
+        return; //left a level
+    }
+    
+    //done
+    printf("Pop\n");
+    printf("Draw %d %d\n", curlevel, curit);
+    
+    return;
 }
-
 
 void display (void)
 {
@@ -112,8 +166,9 @@ void display (void)
    glTranslatef(0.0, 0.0, -15.0);
 
 	/* function which calls transformations and drawing of objects */
-   drawObjects(0, 0);
-
+   drawObjects(numberLevels, 0, 0, 0);
+    printf("Done");
+    
    glPopMatrix ();
 
    glFlush ();
@@ -169,12 +224,15 @@ void keyboard(unsigned char key, int x, int y)
 
 
 	/* read data file and store in arrays */
-void readFile(char **argv)
+ShapeInfo** readFile(char **argv)
 {
     FILE *fp;
     char instr[1024];
-    int count;
-
+    numberLevels = 0;
+    int curLine = 0;
+    ShapeInfo** shapeArray = NULL;
+    
+    
 	/* open file and print error message if name incorrect */
    if ((fp = fopen(argv[1], "r")) == NULL) {
       printf("ERROR, could not open file.\n");
@@ -182,25 +240,66 @@ void readFile(char **argv)
       exit(1);
    }
     
+    while(fgets(instr,1024, fp) != NULL){
+        if(instr[0] == '#') /* ignore comment in line count */
+            continue;
+        numberLevels++;
+    }
+    
+    shapeArray = (ShapeInfo**) malloc(sizeof(ShapeInfo*) * numberLevels); //init array
+    
+    rewind(fp);
     while(fgets(instr, 1024, fp) != NULL){
+        if(instr[0] == '#') /* ignore comment */
+            continue;
+        
+        shapeArray[curLine] = (ShapeInfo*) malloc(sizeof(ShapeInfo));
+        sscanf(instr, "%d %d %d %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
+               &shapeArray[curLine]->shape,
+               &shapeArray[curLine]->colour,
+               &shapeArray[curLine]->iterations,
+               &shapeArray[curLine]->size,
+               &shapeArray[curLine]->inx,
+               &shapeArray[curLine]->xoff,
+               &shapeArray[curLine]->iny,
+               &shapeArray[curLine]->yoff,
+               &shapeArray[curLine]->inz,
+               &shapeArray[curLine]->zoff,
+               &shapeArray[curLine]->inxr,
+               &shapeArray[curLine]->xroff,
+               &shapeArray[curLine]->inyr,
+               &shapeArray[curLine]->yroff,
+               &shapeArray[curLine]->inzr,
+               &shapeArray[curLine]->zroff,
+               &shapeArray[curLine]->inxs,
+               &shapeArray[curLine]->xsoff,
+               &shapeArray[curLine]->inys,
+               &shapeArray[curLine]->ysoff,
+               &shapeArray[curLine]->inzs,
+               &shapeArray[curLine]->zsoff
+               );
+        curLine++;
         
     };
+
     
 	/* the code to read the input file goes here */
 	/* numlevels is set to the number of lines in the file not including the first comment line */
 
-   fclose(fp);
+    fclose(fp);
+    
+    return shapeArray;
 }
 
 
 /*  Main Loop
- *  Open window with initial window size, title bar, 
+ *  Open window with initial window size, title bar,
  *  RGBA display mode, and handle input events.
  */
 int main(int argc, char** argv)
 {
 
-   readFile(argv);
+   shapes = readFile(argv);
 
    glutInit(&argc, argv);
    glutInitDisplayMode (GLUT_SINGLE | GLUT_RGBA | GLUT_DEPTH);

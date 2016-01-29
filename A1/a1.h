@@ -46,14 +46,5 @@ typedef struct ShapeInfo {
     float zsoff;
 } ShapeInfo;
 
-typedef struct ShapeList {
-    ShapeInfo* next;
-    ShapeInfo* prev;
-    ShapeInfo* current;
-} ShapeList;
-
-
-
-
 
 #endif
