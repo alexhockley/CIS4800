@@ -112,17 +112,17 @@ void drawObjects(int level, int numits, int curlevel, int curit)
     
     if(curlevel < level){ //down a level
         //printf("draw: %d %d\n", curlevel, curit);
-        printf("Move\n");
+        printf("Move to shape %d\n", curlevel);
         printf("Push %d %d\n", curlevel, curit);
         drawObjects(level, numits, curlevel+1, curit);
         
     }
     else{
-        printf("Pop\n");
+        printf("Pop from shape %d\n", curlevel);
         return; //up a level
     }
     if(curit < shapes[curlevel]->iterations){ //right a level
-        printf("Move\n");
+        printf("Move to shape %d\n", curlevel);
         printf("Push %d %d\n", curlevel, curit);
         drawObjects(level,numits,curlevel, curit+1);
     }
@@ -132,7 +132,7 @@ void drawObjects(int level, int numits, int curlevel, int curit)
     }
     
     //done
-    printf("Pop\n");
+    printf("Pop to shape %d\n", curlevel);
     printf("Draw %d %d\n", curlevel, curit);
     
     return;
