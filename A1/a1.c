@@ -90,7 +90,7 @@ void init (void)
       glLightfv (GL_LIGHT0, GL_SPECULAR, light_full_off);
    }
    glLightfv (GL_LIGHT0, GL_POSITION, light_position);
-   
+
    glEnable (GL_LIGHTING);
    glEnable (GL_LIGHT0);
    glEnable(GL_DEPTH_TEST);
@@ -98,43 +98,86 @@ void init (void)
    glEnable(GL_NORMALIZE);
 }
 
+/* Transformation matrix should be set before calling this. So this draws it at the current location*/
+void drawShape(ShapeInfo* si)
+{
+  GLfloat blue[]  = {0.0, 0.0, 1.0, 1.0};
+  GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
+  GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
+  GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
+
+  switch(si->colour)
+  {
+    case(COLOUR_BLUE):
+      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, blue);
+      break;
+    case(COLOUR_RED):
+      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, red);
+      break;
+    case(COLOUR_GREEN):
+      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, green);
+      break;
+    case(COLOUR_WHITE):
+      glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, white);
+      break;
+  }
+
+  switch(si->shape)
+  {
+    case(SHAPE_SPHERE):
+      glutSolidSphere (si->size, 30, 30);
+      break;
+    case(SHAPE_CUBE):
+      glutSolidCube(si->size);
+      break;
+    case(SHAPE_TORUS):
+      glutSolidTorus(si->size/2.0f, si->size, 2, 1);
+      break;
+    case(SHAPE_CONE):
+      glutSolidCone(si->size/1.5f, si->size, 30, 30);
+      break;
+    default:
+      printf("Shape not supported");
+  }
+
+  return;
+}
+
 /* level is number of entries in the file, numits is the number of interations for each entry (column 3 on each
 	line in the file  */
 void drawObjects(int level, int numits, int curlevel, int curit)
 {
-    GLfloat blue[]  = {0.0, 0.0, 1.0, 1.0};
-    GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
-    GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
-    GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
-    
-    //glPopMatrix(); //pop matrix
-    
-    
+
     if(curlevel < level){ //down a level
         //printf("draw: %d %d\n", curlevel, curit);
         printf("Move to shape %d\n", curlevel);
+        glPushMatrix();
         printf("Push %d %d\n", curlevel, curit);
         drawObjects(level, numits, curlevel+1, curit);
-        
+
     }
     else{
+        glPopMatrix();
         printf("Pop from shape %d\n", curlevel);
         return; //up a level
     }
     if(curit < shapes[curlevel]->iterations){ //right a level
         printf("Move to shape %d\n", curlevel);
+        glPushMatrix();
         printf("Push %d %d\n", curlevel, curit);
         drawObjects(level,numits,curlevel, curit+1);
     }
     else{
-        
+
         return; //left a level
     }
-    
+
     //done
     printf("Pop to shape %d\n", curlevel);
+    glPopMatrix();
     printf("Draw %d %d\n", curlevel, curit);
-    
+    drawShape(shapes[curlevel]);
+
     return;
 }
 
@@ -152,7 +195,7 @@ void display (void)
 	/* draw polygons as either solid or outlines */
    if (lineDrawing == 1)
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-   else 
+   else
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 	/* give all objects the same shininess value */
@@ -168,7 +211,7 @@ void display (void)
 	/* function which calls transformations and drawing of objects */
    drawObjects(numberLevels, 0, 0, 0);
     printf("Done");
-    
+
    glPopMatrix ();
 
    glFlush ();
@@ -231,28 +274,28 @@ ShapeInfo** readFile(char **argv)
     numberLevels = 0;
     int curLine = 0;
     ShapeInfo** shapeArray = NULL;
-    
-    
+
+
 	/* open file and print error message if name incorrect */
    if ((fp = fopen(argv[1], "r")) == NULL) {
       printf("ERROR, could not open file.\n");
       printf("Usage: %s <filename>\n", argv[0]);
       exit(1);
    }
-    
+
     while(fgets(instr,1024, fp) != NULL){
         if(instr[0] == '#') /* ignore comment in line count */
             continue;
         numberLevels++;
     }
-    
+
     shapeArray = (ShapeInfo**) malloc(sizeof(ShapeInfo*) * numberLevels); //init array
-    
+
     rewind(fp);
     while(fgets(instr, 1024, fp) != NULL){
         if(instr[0] == '#') /* ignore comment */
             continue;
-        
+
         shapeArray[curLine] = (ShapeInfo*) malloc(sizeof(ShapeInfo));
         sscanf(instr, "%d %d %d %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
                &shapeArray[curLine]->shape,
@@ -279,15 +322,15 @@ ShapeInfo** readFile(char **argv)
                &shapeArray[curLine]->zsoff
                );
         curLine++;
-        
+
     };
 
-    
+
 	/* the code to read the input file goes here */
 	/* numlevels is set to the number of lines in the file not including the first comment line */
 
     fclose(fp);
-    
+
     return shapeArray;
 }
 
@@ -313,6 +356,5 @@ int main(int argc, char** argv)
    glutKeyboardFunc (keyboard);
 
    glutMainLoop();
-   return 0; 
+   return 0;
 }
-
