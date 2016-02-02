@@ -1,3 +1,11 @@
+/*
+ Alex Hockley
+ 0758114
+ a1.c
+ February 1, 2016
+ 
+ This program reads a predefined file format and recursively draws shapes to the screen using OpenGL.
+*/
 
 /* Derived from scene.c in the The OpenGL Programming Guide */
 
@@ -18,6 +26,7 @@
 #include <OpenGL/glu.h>
 #include <GLUT/glut.h>
 
+/*Constants for shape type and colour*/
 #define SHAPE_SPHERE    0
 #define SHAPE_CUBE      1
 #define SHAPE_TORUS     2
@@ -28,9 +37,7 @@
 #define COLOUR_GREEN    2
 #define COLOUR_WHITE    3
 
-int shapesDrawn = 0;
-
-
+/* Struct for containing the shape info read in from file */
 typedef struct ShapeInfo {
     int shape;
     int colour;
@@ -56,11 +63,11 @@ typedef struct ShapeInfo {
     float zsoff;
 } ShapeInfo;
 
-	/* number of lines in the input file */
+
+/* number of lines in the input file */
 int numberLevels;
 
 ShapeInfo** shapes = NULL;
-int* rh = NULL;
 
 	/* flags used to control the appearance of the image */
 int lineDrawing = 1;	// draw polygons as solid or lines
@@ -103,11 +110,13 @@ void init (void)
 /* Transformation matrix should be set before calling this. So this draws it at the current location*/
 void drawShape(ShapeInfo* si)
 {
+    /* initialize colour matrices */
   GLfloat blue[]  = {0.0, 0.0, 1.0, 1.0};
   GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
   GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
   GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
 
+    /* Switch over colour */
   switch(si->colour)
   {
     case(COLOUR_BLUE):
@@ -122,8 +131,11 @@ void drawShape(ShapeInfo* si)
     case(COLOUR_WHITE):
       glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, white);
       break;
+    default:
+          Printf("Colour not supported\n");
   }
 
+    /* Switch over shape */
   switch(si->shape)
   {
     case(SHAPE_SPHERE):
@@ -139,13 +151,13 @@ void drawShape(ShapeInfo* si)
       glutSolidCone(si->size, si->size, 30, 30);
       break;
     default:
-      printf("Shape not supported");
+      printf("Shape not supported\n");
   }
 
   return;
 }
 
-void drawObjects2(int level, int numits, int curlevel, int curit)
+void drawObjects(int level, int numits, int curlevel, int curit)
 {
    
     //if we leave the bounds of the "tree" start recursing back
@@ -153,6 +165,7 @@ void drawObjects2(int level, int numits, int curlevel, int curit)
         return;
     
     
+    /* use offsets for subsequent iterations */
     if(curit > 0)
     {
         glTranslatef(shapes[curlevel]->xoff,shapes[curlevel]->yoff, shapes[curlevel]->zoff);
@@ -163,7 +176,7 @@ void drawObjects2(int level, int numits, int curlevel, int curit)
         
         glScalef(shapes[curlevel]->xsoff ,shapes[curlevel]->ysoff, shapes[curlevel]->zsoff);
     }
-    else
+    else /*otherwise use initial values */
     {
         
         glTranslatef(shapes[curlevel]->inx, shapes[curlevel]->iny, shapes[curlevel]->inz);
@@ -176,15 +189,15 @@ void drawObjects2(int level, int numits, int curlevel, int curit)
         
     }
     
+    /* draw the current shape the to the current location as defined in the matrix */
     drawShape(shapes[curlevel]);
-    shapesDrawn++;
     
     
     //go down a level
-    drawObjects2(level, numits, curlevel+1, 0);
+    drawObjects(level, numits, curlevel+1, 0);
    
     //go right an iteration
-    drawObjects2(level, numits, curlevel, curit+1);
+    drawObjects(level, numits, curlevel, curit+1);
     
     
 }
@@ -215,17 +228,10 @@ void display (void)
    glRotatef(180.0, 0.0, 1.0, 0.0);
    glRotatef(180.0, 0.0, 0.0, 1.0);
    glTranslatef(0.0, 0.0, -15.0);
-	/* function which calls transformations and drawing of objects */
-    //glPopMatrix();
-   drawObjects2(numberLevels, 0, 0, 0);
     
-    int num;
-    glGetIntegerv(GL_MODELVIEW_STACK_DEPTH, &num);
-    printf("Stack size: %d\n", num);
-    printf("Done");
+    /* Draw the objects to the screen */
+   drawObjects(numberLevels, 0, 0, 0);
 
-    printf("Shapes drawn %d\n", shapesDrawn);
-    shapesDrawn=0;
    glPopMatrix ();
 
    glFlush ();
@@ -309,7 +315,8 @@ ShapeInfo** readFile(char **argv)
     while(fgets(instr, 1024, fp) != NULL){
         if(instr[0] == '#') /* ignore comment */
             continue;
-
+        
+            /* read values into struct, can assume proper file format */
         shapeArray[curLine] = (ShapeInfo*) malloc(sizeof(ShapeInfo));
         sscanf(instr, "%d %d %d %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f %f",
                &shapeArray[curLine]->shape,
@@ -335,6 +342,11 @@ ShapeInfo** readFile(char **argv)
                &shapeArray[curLine]->inzs,
                &shapeArray[curLine]->zsoff
                );
+        
+        /* Error out if iterations is less than 1 */
+        if(shapeArray[curLine]->iterations <= 0)
+            printf("Iterations had invalid value of %d on line %d\n", shapeArray[curLine]->iterations, curLine);
+        
         curLine++;
 
     };
