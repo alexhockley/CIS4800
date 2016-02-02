@@ -28,6 +28,8 @@
 #define COLOUR_GREEN    2
 #define COLOUR_WHITE    3
 
+int shapesDrawn = 0;
+
 
 typedef struct ShapeInfo {
     int shape;
@@ -58,7 +60,7 @@ typedef struct ShapeInfo {
 int numberLevels;
 
 ShapeInfo** shapes = NULL;
-
+int* rh = NULL;
 
 	/* flags used to control the appearance of the image */
 int lineDrawing = 1;	// draw polygons as solid or lines
@@ -131,10 +133,10 @@ void drawShape(ShapeInfo* si)
       glutSolidCube(si->size);
       break;
     case(SHAPE_TORUS):
-      glutSolidTorus(si->size/2.0f, si->size, 2, 1);
+      glutSolidTorus(si->size/2.0f, si->size, 10, 10);
       break;
     case(SHAPE_CONE):
-      glutSolidCone(si->size/1.5f, si->size, 30, 30);
+      glutSolidCone(si->size, si->size, 30, 30);
       break;
     default:
       printf("Shape not supported");
@@ -143,42 +145,48 @@ void drawShape(ShapeInfo* si)
   return;
 }
 
-/* level is number of entries in the file, numits is the number of interations for each entry (column 3 on each
-	line in the file  */
-void drawObjects(int level, int numits, int curlevel, int curit)
+void drawObjects2(int level, int numits, int curlevel, int curit)
 {
-
-    if(curlevel < level){ //down a level
-        //printf("draw: %d %d\n", curlevel, curit);
-        printf("Move to shape %d\n", curlevel);
-        glPushMatrix();
-        printf("Push %d %d\n", curlevel, curit);
-        drawObjects(level, numits, curlevel+1, curit);
-
+   
+    //if we leave the bounds of the "tree" start recursing back
+    if(curlevel >= level || curit >= shapes[curlevel]->iterations)
+        return;
+    
+    
+    if(curit > 0)
+    {
+        glTranslatef(shapes[curlevel]->xoff,shapes[curlevel]->yoff, shapes[curlevel]->zoff);
+        
+        glRotatef(shapes[curlevel]->xroff, 1 , 0, 0);
+        glRotatef(shapes[curlevel]->yroff, 0 , 1, 0);
+        glRotatef(shapes[curlevel]->zroff, 0 , 0, 1);
+        
+        glScalef(shapes[curlevel]->xsoff ,shapes[curlevel]->ysoff, shapes[curlevel]->zsoff);
     }
-    else{
-        glPopMatrix();
-        printf("Pop from shape %d\n", curlevel);
-        return; //up a level
+    else
+    {
+        
+        glTranslatef(shapes[curlevel]->inx, shapes[curlevel]->iny, shapes[curlevel]->inz);
+        
+        glRotatef(shapes[curlevel]->inxr, 1 , 0, 0);
+        glRotatef(shapes[curlevel]->inyr, 0 , 1, 0);
+        glRotatef(shapes[curlevel]->inzr, 0 , 0, 1);
+        
+        glScalef(shapes[curlevel]->inxs ,shapes[curlevel]->inys, shapes[curlevel]->inzs);
+        
     }
-    if(curit < shapes[curlevel]->iterations){ //right a level
-        printf("Move to shape %d\n", curlevel);
-        glPushMatrix();
-        printf("Push %d %d\n", curlevel, curit);
-        drawObjects(level,numits,curlevel, curit+1);
-    }
-    else{
-
-        return; //left a level
-    }
-
-    //done
-    printf("Pop to shape %d\n", curlevel);
-    glPopMatrix();
-    printf("Draw %d %d\n", curlevel, curit);
+    
     drawShape(shapes[curlevel]);
-
-    return;
+    shapesDrawn++;
+    
+    
+    //go down a level
+    drawObjects2(level, numits, curlevel+1, 0);
+   
+    //go right an iteration
+    drawObjects2(level, numits, curlevel, curit+1);
+    
+    
 }
 
 void display (void)
@@ -207,11 +215,17 @@ void display (void)
    glRotatef(180.0, 0.0, 1.0, 0.0);
    glRotatef(180.0, 0.0, 0.0, 1.0);
    glTranslatef(0.0, 0.0, -15.0);
-
 	/* function which calls transformations and drawing of objects */
-   drawObjects(numberLevels, 0, 0, 0);
+    //glPopMatrix();
+   drawObjects2(numberLevels, 0, 0, 0);
+    
+    int num;
+    glGetIntegerv(GL_MODELVIEW_STACK_DEPTH, &num);
+    printf("Stack size: %d\n", num);
     printf("Done");
 
+    printf("Shapes drawn %d\n", shapesDrawn);
+    shapesDrawn=0;
    glPopMatrix ();
 
    glFlush ();
@@ -343,6 +357,12 @@ int main(int argc, char** argv)
 {
 
    shapes = readFile(argv);
+    
+    int i = 0;
+    for(i = 0; i < numberLevels; i++)
+    {
+        printf("%d\n", shapes[i]->iterations);
+    }
 
    glutInit(&argc, argv);
    glutInitDisplayMode (GLUT_SINGLE | GLUT_RGBA | GLUT_DEPTH);
