@@ -132,7 +132,7 @@ void drawShape(ShapeInfo* si)
       glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, white);
       break;
     default:
-          Printf("Colour not supported\n");
+          printf("Colour not supported\n");
   }
 
     /* Switch over shape */
