@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
 /*
 #include <GL/gl.h>
 #include <GL/glu.h>
@@ -18,7 +20,7 @@ int lighting = 0;	// use diffuse and specular lighting
 int smoothShading = 0;  // smooth or flat shading
 int textures = 0;
 int twidth = 0;
-int thieght = 0;
+int theight = 0;
 
 GLubyte  Image[64][64][4];
 GLuint   textureID[1];
@@ -31,17 +33,24 @@ typedef struct Map {
     int** vals;
 } Map;
 
-typedef struct Triangle {
-    Point3D** points;
-    Point3D* normalPoint;
-} VertexNormal;
-
 typedef struct Point3D{
     float x;
     float y;
     float z;
 } Point3D;
 
+typedef struct Triangle {
+    Point3D** points;
+    Point3D* normalPoint;
+} Triangle;
+
+
+
+Point3D** vertexNormals = NULL;
+Triangle*** globTriangles = NULL;
+Map* heightMap = NULL;
+
+void drawTriangles(Triangle***);
 
 /*  Initialize material property and light source.
  */
@@ -96,12 +105,13 @@ void display (void)
 
 	/* set starting location of objects */
    glPushMatrix ();
-    
+    drawTriangles(globTriangles);
     glPopMatrix ();
    glFlush ();
 }
 
-Triangle** generateTrianglePoints(Map map)
+
+Triangle*** generateTrianglePoints(Map* map)
 {
     int i=0, j=0;
     Point3D* point = NULL;
@@ -113,7 +123,7 @@ Triangle** generateTrianglePoints(Map map)
     theight = (map->height-1);
     twidth = ((map->width*2)-2);
     
-    Triangle*** triangles = (Triangle**)malloc(sizeof(Triangle**)* theight);
+    Triangle*** triangles = (Triangle***)malloc(sizeof(Triangle**)* theight);
     for(int i = 0; i < map->height -1; i++)
     {
         triangles[i] = (Triangle**)malloc(sizeof(Triangle*)* twidth);
@@ -125,6 +135,7 @@ Triangle** generateTrianglePoints(Map map)
             //init triangle memory
             tri = (Triangle*)malloc(sizeof(Triangle));
             tri->points = (Point3D**)malloc(sizeof(Point3D*) * 3);
+            tri->normalPoint = NULL;
             
             //get 3 points
             for(int n = 0; n < 3; n++){
@@ -210,15 +221,24 @@ void calculateSurfaceNormals(Triangle*** triangles)
     Point3D* point = NULL;
     for(int i = 0; i < theight; i++){
         for(int j = 0; j < twidth; j++){
-            point = (Point3D*)malloc(sizeof(Point3D));
+            if(triangles[i][j] == NULL)
+                point = (Point3D*)malloc(sizeof(Point3D));
+            else
+                point = triangles[i][j]->normalPoint;
             
-            /*calculate cross product
-             point->x = crossx;
-             point->y = crossy;
-             point->z = crossz;
-             */
+            float Ux = triangles[i][j]->points[1]->x - triangles[i][j]->points[0]->x;
+            float Uy = triangles[i][j]->points[1]->y - triangles[i][j]->points[0]->y;
+            float Uz = triangles[i][j]->points[1]->z - triangles[i][j]->points[0]->z;
             
-            triangles->normalPoint = point;
+            float Vx = triangles[i][j]->points[2]->x - triangles[i][j]->points[0]->x;
+            float Vy = triangles[i][j]->points[2]->x - triangles[i][j]->points[0]->x;
+            float Vz = triangles[i][j]->points[2]->x - triangles[i][j]->points[0]->x;
+            
+            point->x = Uy*Vz - Uz*Vy;
+            point->y = Uz*Vx - Ux*Vz;
+            point->z = Ux*Vy - Uy*Vx;
+            
+            triangles[i][j]->normalPoint = point;
         }
     }
 }
@@ -226,27 +246,159 @@ void calculateSurfaceNormals(Triangle*** triangles)
 void calculateVertexNormals(Triangle*** triangles)
 {
     Point3D* vertexNormal = NULL;
+    Point3D** vertexNormals = (Point3D**)malloc(sizeof(Point3D*)*(twidth*theight));
+    int normalCounter = 0;
+    float xTot = 0.0f;
+    float yTot = 0.0f;
+    float zTot = 0.0f;
+    int numSurfaces = 0;
     //handles everything except the left and bottom border vertices
-    for(int i = 0; i < theight; i++){
-        for(int j = 0; j < twidth; j+=2){
+    for(int i = 0; i < theight; i++)
+    {
+        for(int j = 0; j < twidth; j+=2)
+        {
             vertexNormal = (Point3D*)malloc(sizeof(Point3D));
-            int numSurfaces = 0;
-            float xTot = 0;
-            float yTot = 0;
-            float zTot = 0;
             
-            if()
+            xTot = 0.0f;
+            yTot = 0.0f;
+            zTot = 0.0f;
+            
+            //this index always exists (cur row and cur col)
+            xTot += triangles[i][j]->normalPoint->x;
+            yTot += triangles[i][j]->normalPoint->y;
+            zTot += triangles[i][j]->normalPoint->z;
+            numSurfaces++;
+            
+            if(! (j-1 < 0)){ //currow -1col
+                xTot += triangles[i][j-1]->normalPoint->x;
+                yTot += triangles[i][j-1]->normalPoint->y;
+                zTot += triangles[i][j-1]->normalPoint->z;
+                numSurfaces++;
+            }
+            if(! (j-2 < 0)){ //currow -2 col
+                xTot += triangles[i][j-2]->normalPoint->x;
+                yTot += triangles[i][j-2]->normalPoint->y;
+                zTot += triangles[i][j-2]->normalPoint->z;
+                numSurfaces++;
+            }
+            if(! (i-1 < 0)){ //-1 row curcol
+                if(! (j+1 >= twidth)){ //-1 row +1 col
+                    xTot += triangles[i-1][j+1]->normalPoint->x;
+                    yTot += triangles[i-1][j+1]->normalPoint->y;
+                    zTot += triangles[i-1][j+1]->normalPoint->z;
+                    numSurfaces++;
+                }
+                if(! (j-1 < 0)){ //-1 row -1col
+                    xTot += triangles[i-1][j-1]->normalPoint->x;
+                    yTot += triangles[i-1][j-1]->normalPoint->y;
+                    zTot += triangles[i-1][j-1]->normalPoint->z;
+                    numSurfaces++;
+                }
+                xTot += triangles[i-1][j]->normalPoint->x;
+                yTot += triangles[i-1][j]->normalPoint->y;
+                zTot += triangles[i-1][j]->normalPoint->z;
+                numSurfaces++;
+            }
+            vertexNormal->x = xTot / numSurfaces;
+            vertexNormal->y = yTot / numSurfaces;
+            vertexNormal->z = zTot / numSurfaces;
+            
+            vertexNormals[normalCounter] = vertexNormal;
+            vertexNormal = NULL;
+            normalCounter++;
         }
     }
+               
+    //now we need to calculate for the special border cases
+    //right column border
+    for(int i = 0; i < theight; i++){
+        xTot = 0.0f;
+        yTot = 0.0f;
+        zTot = 0.0f;
+        vertexNormal = (Point3D*)malloc(sizeof(Point3D));
+        
+        numSurfaces = 0;
+        
+        if(twidth-1 > 0){ //always do last triangle
+            xTot += triangles[i][twidth-1]->normalPoint->x;
+            yTot += triangles[i][twidth-1]->normalPoint->y;
+            zTot += triangles[i][twidth-1]->normalPoint->z;
+            numSurfaces++;
+        }
+        
+        if(twidth-2 > 0 && i < (theight - 1)){ //do one to the left if we arent on the bottom right point
+            xTot += triangles[i][twidth-2]->normalPoint->x;
+            yTot += triangles[i][twidth-2]->normalPoint->y;
+            zTot += triangles[i][twidth-2]->normalPoint->z;
+            numSurfaces++;
+        }
+        
+        
+        if(i > 0 && i < (theight-1)){ //not top left point and not bottom right point
+            //do one triangle above as well
+            if((i - 1) >= 0)
+            {
+                xTot += triangles[i-1][twidth-1]->normalPoint->x;
+                yTot += triangles[i-1][twidth-1]->normalPoint->y;
+                zTot += triangles[i-1][twidth-1]->normalPoint->z;
+                numSurfaces++;
+            }
+        }
+        
+        vertexNormal->x = xTot / numSurfaces;
+        vertexNormal->y = yTot / numSurfaces;
+        vertexNormal->z = zTot / numSurfaces;
+        
+        vertexNormals[normalCounter] = vertexNormal;
+        normalCounter++;
+        vertexNormal = NULL;
+    }
+    
+    //bottom row border, except the final one which was already calculated
+    for(int i = 0; i < twidth-1; i+=2){
+        xTot = 0.0f;
+        yTot = 0.0f;
+        zTot = 0.0f;
+        vertexNormal = (Point3D*)malloc(sizeof(Point3D));
+        numSurfaces = 0;
+        
+        //current triangle
+        xTot += triangles[theight-1][i]->normalPoint->x;
+        yTot += triangles[theight-1][i]->normalPoint->y;
+        zTot += triangles[theight-1][i]->normalPoint->z;
+        numSurfaces++;
+        
+        if(i + 1 < twidth-1){ //if there is a triangle to the right
+            xTot += triangles[theight-1][i+1]->normalPoint->x;
+            yTot += triangles[theight-1][i+1]->normalPoint->y;
+            zTot += triangles[theight-1][i+1]->normalPoint->z;
+            numSurfaces++;
+        }
+        
+        if(i - 1 > 0 && i < twidth - 1){ //if there is a triangle to the left and we're not on the last one
+            xTot += triangles[theight-1][i-1]->normalPoint->x;
+            yTot += triangles[theight-1][i-1]->normalPoint->y;
+            zTot += triangles[theight-1][i-1]->normalPoint->z;
+            numSurfaces++;
+        }
+        
+        
+        vertexNormal->x = xTot / numSurfaces;
+        vertexNormal->y = yTot / numSurfaces;
+        vertexNormal->z = zTot / numSurfaces;
+        vertexNormals[normalCounter] = vertexNormal;
+        normalCounter++;
+    }
+    
 }
 
-void drawTriangles(Triangle*** triangles, float heightmod)
+void drawTriangles(Triangle*** triangles)
 {
     glBegin(GL_TRIANGLES);
     for(int i = 0; i < theight; i++){
         for(int j = 0; j < twidth; j++){
             for(int k = 0; k < 3; k++){
-                glVertex3f(triangles[i][j]->points[k]->x,triangles[i][j]->points[k]->y * heightmod,triangles[i][j]->points[k]->z);
+                glVertex3f(triangles[i][j]->points[k]->x,triangles[i][j]->points[k]->y,triangles[i][j]->points[k]->z);
             }
         }
     }
@@ -258,15 +410,58 @@ void freeTriangles(Triangle*** triangles)
     for(int i = 0; i < theight; i++){
         for(int j = 0; j < twidth; j++){
             for(int k = 0; k < 3; k++){
-                free(triangles[i][j]->points[k]);
+                if(triangles[i][j]->points[k] != NULL){
+                    free(triangles[i][j]->points[k]);
+                    triangles[i][j]->points[k] = NULL;
+                }
+                
             }
-            free(triangles[i][j]->points);
-            free(triangles[i][j]->normalPoint);
+            if(triangles[i][j]->points != NULL){
+                free(triangles[i][j]->points);
+                triangles[i][j]->points = NULL;
+            }
+            
+            if(triangles[i][j]->normalPoint != NULL){
+                free(triangles[i][j]->normalPoint);
+                triangles[i][j]->normalPoint = NULL;
+            }
             
         }
     }
-    free(triangles);
+    
+    if(triangles != NULL)
+        free(triangles);
     triangles = NULL;
+}
+
+void scaleTriangles(Triangle*** triangles, float heightmod)
+{
+    for(int i = 0; i < theight; i++){
+        for(int j = 0; j < twidth; j++){
+            for(int k = 0; k < 3; k++){
+                triangles[i][j]->points[k]->y = triangles[i][j]->points[k]->y * heightmod;
+            }
+        }
+    }
+}
+
+void updateTriangles(Triangle*** triangles, float heightmod)
+{
+    scaleTriangles(triangles,heightmod);
+    
+    if(vertexNormals != NULL){
+        free(vertexNormals);
+        vertexNormals = NULL;
+    }
+    
+    calculateSurfaceNormals(triangles);
+    
+    if(vertexNormals != NULL){
+        free(vertexNormals);
+        vertexNormals = NULL;
+    }
+    
+    calculateVertexNormals(triangles);
 }
 
 void reshape(int w, int h)
@@ -347,7 +542,8 @@ Map* loadMap(char* fname) {
             continue;
         
         if(lineNo == 0){ //check if first line that is not a comment is the file format
-            if(instr != NULL && strlen(instr) >= 2){
+            
+            if(strlen(instr) >= 2){
                 if(instr[0] != 'P' || instr[1] != '2'){
                     printf("Wrong file format specified, must be P2");
                     exit(0);
@@ -357,7 +553,9 @@ Map* loadMap(char* fname) {
                 printf("Wrong file format specified, must be P2");
                 exit(0);
             }
+            lineNo++;
         }
+        printf("%s\n", instr);
         
         if(lineNo == 1){ //width height depth values
             sscanf(instr, "%d %d %d",
@@ -365,26 +563,27 @@ Map* loadMap(char* fname) {
                    &heightmap->height,
                    &heightmap->depth);
             int i = 0;
-            heightmap->map = (int**)malloc(sizeof(int*)*heightmap->height);
+            heightmap->vals = (int**)malloc(sizeof(int*)*heightmap->height);
             for(i = 0; i < heightmap->height; i++)
-                heightmap->map[i] = (int*) malloc(sizeof(int)*heightmap->width);
+                heightmap->vals[i] = (int*) malloc(sizeof(int)*heightmap->width);
             
             break;
+            lineNo++;
         }
     }
     
     //start character-by-character parsing
-    char c = '';
+    char c;
     int lineSkip = 0;
     int curRow = 0;
     int curCol = 0;
     int numCounter = 0;
-    int tempStr[1024];
+    char tempStr[1024];
     int strCnt = 0;
     int inVal = 0;
     
     //potential issue: If EOF comes right after the last number with no whitespace
-    while(c = fgetc(fp) != EOF)
+    while((c = fgetc(fp)) != EOF)
     {
         if(c == '\n' && inVal == 0){ //if we hit newline, set skip to false
             lineSkip = 0;
@@ -399,7 +598,7 @@ Map* loadMap(char* fname) {
             inVal = 0;
             
             //copy and clear
-            sscanf(tempStr,"%d",heightmap->map[curRow][curCol]);
+            sscanf(tempStr,"%d",&heightmap->vals[curRow][curCol]);
             memset(tempStr, '\0', 1024);
             
             //next number counter
@@ -433,7 +632,8 @@ int main(int argc, char** argv)
    glutInitWindowSize (1024, 768);
    glutCreateWindow (argv[0]);
    init();
-   loadMap();
+   heightMap = loadMap(argv[1]);
+    globTriangles = generateTrianglePoints(heightMap);
    glutReshapeFunc (reshape);
    glutDisplayFunc(display);
    glutKeyboardFunc (keyboard);
