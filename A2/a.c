@@ -1,6 +1,14 @@
 
 /* Derived from scene.c in the The OpenGL Programming Guide */
 
+/*
+ Alex Hockley
+ 0758114
+ Feb 29 2016
+ CIS 4800 Assignment 2
+ Draws a heightmap using OpenGL and uses mouse events to scale/zoom
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -21,9 +29,22 @@ int smoothShading = 0;  // smooth or flat shading
 int textures = 0;
 int twidth = 0;
 int theight = 0;
+float maxVal = 0;
+float zoomfactor = 1.0f;
+
+int winWidth = 0;
+int winHeight = 0;
+
+float camX = 2;
+float camY = 2;
+float camZ = 2;
 
 GLubyte  Image[64][64][4];
 GLuint   textureID[1];
+
+int oldMouseY = 0;
+int mouseRightDown = 0;
+int mouseLeftDown = 0;
 
 
 typedef struct Map {
@@ -88,29 +109,83 @@ void display (void)
     GLfloat red[]   = {1.0, 0.0, 0.0, 1.0};
     GLfloat green[] = {0.0, 1.0, 0.0, 1.0};
     GLfloat white[] = {1.0, 1.0, 1.0, 1.0};
-
+    GLfloat gray[] = {0.5, 0.5, 0.5, 1.0};
+    
     glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
+    
     /* draw surfaces as either smooth or flat shaded */
     if (smoothShading == 1)
         glShadeModel(GL_SMOOTH);
     else
         glShadeModel(GL_FLAT);
-
-	/* draw polygons as either solid or outlines */
-   if (lineDrawing == 1)
-      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-   else 
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
-	/* set starting location of objects */
-   glPushMatrix ();
-    drawTriangles(globTriangles);
+    
+    /* draw polygons as either solid or outlines */
+    if (lineDrawing == 1)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    else
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    
+    /* set starting location of objects */
+    glPushMatrix ();
+    gluLookAt(camX, camY, camZ,
+              0.5, 0.5, 0.5,
+              0, 1, 0);
+    
+    /* give all objects the same shininess value */
+    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 30.0);
+    
+    /* set colour of cone */
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, red);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+    /* move to location for object then draw it */
+    glPushMatrix ();
+    glTranslatef (-0.75, -0.5, 0.0);
+    glRotatef (270.0, 1.0, 0.0, 0.0);
+    //glutSolidCone (1.0, 2.0, 15, 15);
     glPopMatrix ();
-   glFlush ();
+    
+    /* set colour of sphere */
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, green);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+    /* move to location for object then draw it */
+    glPushMatrix ();
+    glTranslatef (0.75, 0.0, -1.0);
+    
+    /* turn texturing on */
+    if (textures == 1) {
+        glEnable(GL_TEXTURE_2D);
+        glBindTexture(GL_TEXTURE_2D, textureID[0]);
+        /* if textured, then use white as base colour */
+        glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, white);
+    }
+    
+    //glutSolidSphere (1.0, 15, 15);
+    
+    if (textures == 1)
+        glDisable(GL_TEXTURE_2D);
+    glPopMatrix ();
+    
+    /* set colour of torus */
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, gray);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, white);
+    /* move to location for object then draw it */
+    glPushMatrix ();
+    glTranslatef (-0.75, 0.5, 0.0);
+    glRotatef (90.0, 1.0, 0.0, 0.0);
+    //glutSolidTorus (0.275, 0.85, 15, 15);
+    
+    glPopMatrix ();
+    drawTriangles(globTriangles);
+    //gluLookAt(0,0,0,  0.5,0.5,0.5, 0,0,0);
+    
+    glPopMatrix ();
+   
+    glFlush ();
+    
+    
 }
 
-
+//generate the triangle points
 Triangle*** generateTrianglePoints(Map* map)
 {
     int i=0, j=0;
@@ -119,16 +194,22 @@ Triangle*** generateTrianglePoints(Map* map)
     int toggle = 0;
     int trow = 0;
     int tcol = 0;
-    
-    theight = (map->height-1);
+    int cnt = 0;
+    int nopoint = 0;
+    theight = (map->height)-1;
     twidth = ((map->width*2)-2);
     
+    printf("total %d\n", theight * twidth);
+    
+    printf("Generating triangle points\n");
+    printf("theight: %d\n", theight);
+    printf("twidth: %d\n", twidth);
+    
     Triangle*** triangles = (Triangle***)malloc(sizeof(Triangle**)* theight);
-    for(int i = 0; i < map->height -1; i++)
+    for(int i = 0; i < map->height; i++)
     {
         triangles[i] = (Triangle**)malloc(sizeof(Triangle*)* twidth);
     }
-    
     for (int i = 0; i < map->height-1; i++){
         for(int j = 0; j < map->width; j++){
             
@@ -137,51 +218,59 @@ Triangle*** generateTrianglePoints(Map* map)
             tri->points = (Point3D**)malloc(sizeof(Point3D*) * 3);
             tri->normalPoint = NULL;
             
+            
             //get 3 points
             for(int n = 0; n < 3; n++){
                 point = (Point3D*)malloc(sizeof(Point3D));
+                
                 if(toggle == 0){
-                    if(j == map->width - 1){
-                        free(point);//get rid of garbage point memory since we wont have reference later
-                        break;
-                    }
-                    toggle = 1;
+                    
                     if(n == 0){
-                        point->x = i;
-                        point->z = j;
-                        point->y = map->vals[i][j];
+                        point->x = i/(float)map->height;
+                        point->z = j/(float)map->width;
+                        point->y = map->vals[i][j]/maxVal;
                     }
-                    else if(n == 1){
-                        point->x = i+1;
-                        point->z = j;
-                        point->y = map->vals[i+1][j];
+                    else if(n == 1 && i+1 < map->height){
+                        point->x = (i+1)/(float)map->height;
+                        point->z = j/(float)map->width;
+                        point->y = map->vals[i+1][j]/maxVal;
                     }
-                    else if(n == 2){
-                        point->x = i;
-                        point->z = j+1;
-                        point->y = map->vals[i][j+1];
+                    else if(n == 2 && j+1 < map->width){
+                        point->x = i/(float)map->height;
+                        point->z = (j+1)/(float)map->width;
+                        point->y = map->vals[i][j+1]/maxVal;
+                    }
+                    else{
+                        nopoint++;
+                        free(point);
+                        point = NULL;
                     }
                 }
                 else{
-                    toggle = 0;
+                    
                     if(n == 0){
-                        point->x = i;
-                        point->z = j;
-                        point->y = map->vals[i][j];
+                        point->x = i/(float)map->height;
+                        point->z = j/(float)map->width;
+                        point->y = map->vals[i][j]/maxVal;
                     }
-                    else if(n == 1){
-                        point->x = i+1;
-                        point->y = j-1;
-                        point->y = map->vals[i+1][j-1];
+                    else if(n == 1 && i+1 < map->height && j-1 >= 0){
+                        point->x = (i+1)/(float)map->height;
+                        point->z = (j-1)/(float)map->width;
+                        point->y = map->vals[i+1][j-1]/maxVal;
                     }
-                    else if(n == 2){
-                        point->x = i+1;
-                        point->y = j;
-                        point->y = map->vals[i+1][j];
+                    else if(n == 2 && i+1 < map->height){
+                        point->x = (i+1)/(float)map->height;
+                        point->z = j/(float)map->width;
+                        point->y = map->vals[i+1][j]/maxVal;
+                    }
+                    else{
+                        nopoint++;
+                        free(point);
+                        point = NULL;
                     }
                 }
                 
-                if(toggle == 0 && j == (map->width - 1)){ //if we didnt build a triangle here, clean up memory and set to null and stop looking for points
+                if(point == NULL){ //if we didnt build a triangle here, clean up memory and set to null and stop looking for points
                     free(tri->points);
                     free(tri);
                     tri = NULL;
@@ -193,9 +282,12 @@ Triangle*** generateTrianglePoints(Map* map)
                 
                 
             }
+            
+            
             if(tri != NULL)
             {
                 triangles[trow][tcol] = tri;
+                cnt++;
                 tcol++;
                 if(tcol >= twidth)
                 {
@@ -204,24 +296,36 @@ Triangle*** generateTrianglePoints(Map* map)
                 }
             }
             
+            
+            
             point = NULL;
             tri = NULL;
-            toggle = 0;
             
+            if(toggle == 1){
+                toggle = 0;
+                j--;
+            }
+            else if(toggle == 0)
+                toggle = 1;
         }
-                
+        
                 
     }
+    printf("Done generating triangles\n");
+    printf("Generated %d triangles\n", cnt);
+    printf("nopoint %d \n", nopoint);
     return triangles;
     
 }
 
+//calculate the surface normals and store them in the triangle
 void calculateSurfaceNormals(Triangle*** triangles)
 {
+    printf("Calculating surface normals\n");
     Point3D* point = NULL;
     for(int i = 0; i < theight; i++){
         for(int j = 0; j < twidth; j++){
-            if(triangles[i][j] == NULL)
+            if(triangles[i][j]->normalPoint == NULL)
                 point = (Point3D*)malloc(sizeof(Point3D));
             else
                 point = triangles[i][j]->normalPoint;
@@ -234,17 +338,21 @@ void calculateSurfaceNormals(Triangle*** triangles)
             float Vy = triangles[i][j]->points[2]->x - triangles[i][j]->points[0]->x;
             float Vz = triangles[i][j]->points[2]->x - triangles[i][j]->points[0]->x;
             
-            point->x = Uy*Vz - Uz*Vy;
-            point->y = Uz*Vx - Ux*Vz;
-            point->z = Ux*Vy - Uy*Vx;
+            point->x = (Uy*Vz) - (Uz*Vy);
+            point->y = (Uz*Vx) - (Ux*Vz);
+            point->z = (Ux*Vy) - (Uy*Vx);
+            
             
             triangles[i][j]->normalPoint = point;
         }
     }
 }
 
+
+//calculate the vertex normals and store them in an array
 void calculateVertexNormals(Triangle*** triangles)
 {
+    printf("Calculating vertex normals\n");
     Point3D* vertexNormal = NULL;
     Point3D** vertexNormals = (Point3D**)malloc(sizeof(Point3D*)*(twidth*theight));
     int normalCounter = 0;
@@ -252,6 +360,7 @@ void calculateVertexNormals(Triangle*** triangles)
     float yTot = 0.0f;
     float zTot = 0.0f;
     int numSurfaces = 0;
+    
     //handles everything except the left and bottom border vertices
     for(int i = 0; i < theight; i++)
     {
@@ -392,14 +501,17 @@ void calculateVertexNormals(Triangle*** triangles)
     
 }
 
+//draw the triangles and assignm the normals (for some reason it is not shading properly
 void drawTriangles(Triangle*** triangles)
 {
+    printf("Drawing triangles\n");
     glBegin(GL_TRIANGLES);
     for(int i = 0; i < theight; i++){
         for(int j = 0; j < twidth; j++){
             for(int k = 0; k < 3; k++){
                 glVertex3f(triangles[i][j]->points[k]->x,triangles[i][j]->points[k]->y,triangles[i][j]->points[k]->z);
             }
+            glNormal3f(triangles[i][j]->normalPoint->x, triangles[i][j]->normalPoint->y, triangles[i][j]->normalPoint->z);
         }
     }
     glEnd();
@@ -434,6 +546,7 @@ void freeTriangles(Triangle*** triangles)
     triangles = NULL;
 }
 
+//scale the triangles up and down with the height mod value
 void scaleTriangles(Triangle*** triangles, float heightmod)
 {
     for(int i = 0; i < theight; i++){
@@ -445,6 +558,7 @@ void scaleTriangles(Triangle*** triangles, float heightmod)
     }
 }
 
+//update the triangle values and normals
 void updateTriangles(Triangle*** triangles, float heightmod)
 {
     scaleTriangles(triangles,heightmod);
@@ -456,29 +570,42 @@ void updateTriangles(Triangle*** triangles, float heightmod)
     
     calculateSurfaceNormals(triangles);
     
-    if(vertexNormals != NULL){
-        free(vertexNormals);
-        vertexNormals = NULL;
-    }
-    
     calculateVertexNormals(triangles);
+    
 }
 
+
+//reshape the window
 void reshape(int w, int h)
 {
    glViewport (0, 0, (GLsizei) w, (GLsizei) h);
    glMatrixMode (GL_PROJECTION);
    glLoadIdentity ();
-   gluPerspective(45.0, (GLfloat)w/(GLfloat)h, 1.0, 10.0);
+   gluPerspective(45.0*zoomfactor, (GLfloat)w/(GLfloat)h, 1.0, 10.0);
    glMatrixMode (GL_MODELVIEW);
    glLoadIdentity ();
+    winWidth = w;
+    winHeight = h;
 }
 
+//zoom in on the model
+void zoom()
+{
+    glMatrixMode (GL_PROJECTION);
+    glLoadIdentity ();
+    gluPerspective(45.0*zoomfactor, (GLfloat)winWidth/(GLfloat)winHeight, 1.0, 10.0);
+    glMatrixMode (GL_MODELVIEW);
+    glLoadIdentity ();
+}
+
+
+//keyboard input event
 void keyboard(unsigned char key, int x, int y)
 {
    switch (key) {
       case 27:
       case 'q':
+           freeTriangles(globTriangles);
          exit(0);
          break;
       case '1':		// draw polygons as outlines
@@ -521,9 +648,12 @@ void keyboard(unsigned char key, int x, int y)
          init();
          display();
          break;
+           
    }
 }
 
+
+//reads the map from file
 Map* loadMap(char* fname) {
     
     FILE *fp;
@@ -537,41 +667,22 @@ Map* loadMap(char* fname) {
     int lineNo = 0;
     Map* heightmap = (Map*)malloc(sizeof(Map));
     
-    while(fgets(instr,10000,fp) != NULL){ //only do this for the first two real lines
+    while(fgets(instr,10000,fp) != NULL){ //only do this for the first real line
         if(instr[0] == '#') //ignore comment
             continue;
-        
-        if(lineNo == 0){ //check if first line that is not a comment is the file format
-            
-            if(strlen(instr) >= 2){
-                if(instr[0] != 'P' || instr[1] != '2'){
-                    printf("Wrong file format specified, must be P2");
-                    exit(0);
-                }
-            }
-            else{
+        if(strlen(instr) >= 2){
+            if(instr[0] != 'P' || instr[1] != '2'){
                 printf("Wrong file format specified, must be P2");
                 exit(0);
             }
-            lineNo++;
         }
-        printf("%s\n", instr);
+        else{
+            printf("Wrong file format specified, must be P2");
+            exit(0);
+        }
+        break;
         
-        if(lineNo == 1){ //width height depth values
-            sscanf(instr, "%d %d %d",
-                   &heightmap->width,
-                   &heightmap->height,
-                   &heightmap->depth);
-            int i = 0;
-            heightmap->vals = (int**)malloc(sizeof(int*)*heightmap->height);
-            for(i = 0; i < heightmap->height; i++)
-                heightmap->vals[i] = (int*) malloc(sizeof(int)*heightmap->width);
-            
-            break;
-            lineNo++;
-        }
     }
-    
     //start character-by-character parsing
     char c;
     int lineSkip = 0;
@@ -582,43 +693,143 @@ Map* loadMap(char* fname) {
     int strCnt = 0;
     int inVal = 0;
     
-    //potential issue: If EOF comes right after the last number with no whitespace
-    while((c = fgetc(fp)) != EOF)
+    memset(tempStr, '\0', 1024);
+    
+    int whdCounter = 0;
+    
+    //start state based parsing
+    while((c = fgetc(fp)))
     {
         if(c == '\n' && inVal == 0){ //if we hit newline, set skip to false
             lineSkip = 0;
             strCnt = 0;
             inVal = 0;
+            //printf("Hit newline, skip to false\n");
         }
         else if(c == '#' || lineSkip == 1){ //read until end of line
             lineSkip = 1;
+            //printf("Reading until end of line\n");
         }
-        else if((c == '\t' || c == ' ' || c == '\n') && inVal == 1){ //end of number
+        else if((c == '\t' || c == ' ' || c == '\n' || c == EOF) && inVal == 1){ //end of number
+            //printf("Found end of number\n");
             strCnt = 0;
             inVal = 0;
+            printf("%s\n", tempStr);
             
-            //copy and clear
-            sscanf(tempStr,"%d",&heightmap->vals[curRow][curCol]);
-            memset(tempStr, '\0', 1024);
+            //if we arent looking for width height depth
+            if(whdCounter >= 3){
+                numCounter++;
             
-            //next number counter
-            curCol++;
-            if(curCol >= heightmap->width){
-                curCol = 0;
-                curRow++;
+                //copy and clear
+                sscanf(tempStr,"%d",&heightmap->vals[curRow][curCol]);
+                memset(tempStr, '\0', 1024);
+            
+            
+                if(heightmap->vals[curRow][curCol] > maxVal)
+                    maxVal =heightmap->vals[curRow][curCol];
+                //next number counter
+                curCol++;
+                if(curCol >= heightmap->width){
+                    curCol = 0;
+                    curRow++;
+                }
+            }
+            else //hack for width height and depth, its not pretty
+            {
+                if(whdCounter == 0)
+                    sscanf(tempStr,"%d",&heightmap->width);
+                if(whdCounter == 1)
+                    sscanf(tempStr,"%d",&heightmap->height);
+                if(whdCounter == 2){
+                    sscanf(tempStr,"%d",&heightmap->depth);
+                    heightmap->vals = (int**)malloc(sizeof(int*)*heightmap->height);
+                    for(int i = 0; i < heightmap->height; i++)
+                        heightmap->vals[i] = (int*) malloc(sizeof(int)*heightmap->width);
+                    
+                }
+                
+                memset(tempStr, '\0', 1024);
+                whdCounter++;
             }
             
         }
         
         else if(isdigit(c) != 0){ //if digit
+            //printf("Found a number\n");
+            inVal = 1;
             tempStr[strCnt] = c; //add digit to string
             strCnt++; //increment string position counter
         }
         
+        if(c == EOF)
+            break;
     }
-    
     fclose(fp);
     return heightmap;
+}
+
+//mouse event function
+void mouseEvent(int button, int state, int x, int y)
+{
+    switch(button){
+        case GLUT_RIGHT_BUTTON:
+            if(state == GLUT_DOWN){
+                oldMouseY = y;
+                mouseRightDown = 1;
+            }
+            else
+                mouseRightDown = 0;
+            break;
+        case GLUT_LEFT_BUTTON:
+            if(state == GLUT_DOWN){
+                oldMouseY = y;
+                mouseLeftDown = 1;
+            }
+            else
+                mouseLeftDown = 0;
+            break;
+    }
+    
+}
+
+//mouse motion function
+void mouseMotion(int x, int y)
+{
+    int updateHappened = 0;
+    if(mouseRightDown == 1)
+    {
+        if(y < oldMouseY){
+            oldMouseY = y;
+            updateTriangles(globTriangles, 1.01f);
+            updateHappened = 1;
+        }
+        else if( y > oldMouseY){
+            oldMouseY = y;
+            updateTriangles(globTriangles, 0.99f);
+            updateHappened = 1;
+        }
+    }
+    if(mouseLeftDown == 1)
+    {
+        if(y < oldMouseY){
+            oldMouseY = y;
+            zoomfactor -= 0.05f;
+            zoom();
+            updateHappened = 1;
+        }
+        else if( y > oldMouseY){
+            oldMouseY = y;
+            zoomfactor += 0.05f;
+            zoom();
+            updateHappened = 1;
+        }
+
+    }
+    if(updateHappened == 1)
+    {
+        init();
+        display();
+    }
 }
 
 /*  Main Loop
@@ -633,10 +844,13 @@ int main(int argc, char** argv)
    glutCreateWindow (argv[0]);
    init();
    heightMap = loadMap(argv[1]);
-    globTriangles = generateTrianglePoints(heightMap);
+   globTriangles = generateTrianglePoints(heightMap);
+    updateTriangles(globTriangles,1);
    glutReshapeFunc (reshape);
    glutDisplayFunc(display);
    glutKeyboardFunc (keyboard);
+    glutMouseFunc(mouseEvent);
+    glutMotionFunc(mouseMotion);
    glutMainLoop();
    return 0; 
 }
