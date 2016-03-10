@@ -27,30 +27,29 @@ int lineDrawing = 1;	// draw polygons as solid or lines
 int lighting = 0;	// use diffuse and specular lighting
 int smoothShading = 0;  // smooth or flat shading
 int textures = 0;
-int twidth = 0;
-int theight = 0;
-float maxVal = 0;
 float zoomfactor = 1.0f;
 
-int winWidth = 0;
-int winHeight = 0;
-
+//location data for the camera
 float camX = 2;
 float camY = 2;
 float camZ = 2;
 
+//location data for the light
 float lightX = 1.0;
 float lightY = 1.0;
 float lightZ = 1.0;
 
+//location data for the static cube
 float cubeX = 0.5;
 float cubeY = 0.5;
 float cubeZ = 0.5;
 
+//location data for the static plane
 float planeX = 0.0;
 float planeY = 0.0;
 float planeZ = 0.0;
 
+//location data for the shadow
 float shadowX = 0.25;
 float shadowY = 0.25;
 float shadowZ = 0.25;
