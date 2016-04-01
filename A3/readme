@@ -1,24 +1,17 @@
 Alex Hockley
 0758114
 CIS*4800
-Assignment 2
+Assignment 3
 
 to run:
 unpack from archive
 type make
-run ./a2 <filename>
+run ./a3
 
 
 deficiencies and notes:
 
-The surface and vertex normals are calculated, although i could not get them shading properly.
-If you wish to see how they are calculated, they are in their respective functions, if that matters.
-
-There are a few missing features
- - camera does not rotate around the point
- - shading does not work properly with the normals
- - colour variations not implemented
- - there is some leftover useless sample code in the display function, trying to remove it just ended up with
-   nothing being displayed, so i left it in because i dont have time to fiddle with that
- - vertex normals were not calculated with OpenGL in mind, so i cant actually call glNormal3f on them with
-   the current data structure to assign them to the correct points. Basically, points arent shared properly
+The textures seem to be a bit glitchy, a few of them appear to be half-and-half with another texture
+The shadow looks a bit off, i think its at an angle to the plain
+Texture file names are hardcoded, wasnt sure if this was the intended method, it wasnt specified in the
+assignment description
