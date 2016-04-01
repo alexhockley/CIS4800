@@ -124,30 +124,12 @@ SceneInfo* sceneInfo = NULL;
  */
 void init (void)
 {
-   GLfloat light_ambient[] = { 0.0, 0.0, 0.0, 1.0 };
-   GLfloat light_diffuse[] = { 1.0, 1.0, 1.0, 1.0 };
-   GLfloat light_specular[] = { 1.0, 1.0, 1.0, 1.0 };
-   GLfloat light_full_off[] = {0.0, 0.0, 0.0, 1.0};
-   GLfloat light_full_on[] = {1.0, 1.0, 1.0, 1.0};
-
-   GLfloat light_position[] = { lightX, lightY, lightZ, 1.0 };
-
-	/* if lighting is turned on then use ambient, diffuse and specular
-	   lights, otherwise use ambient lighting only */
-   glLightfv (GL_LIGHT0, GL_AMBIENT, light_ambient);
-   glLightfv (GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-   glLightfv (GL_LIGHT0, GL_SPECULAR, light_specular);
-   glLightfv (GL_LIGHT0, GL_POSITION, light_position);
-
-
-   glEnable (GL_LIGHTING);
-   glEnable (GL_LIGHT0);
-   glEnable(GL_DEPTH_TEST);
+   
 }
 
 void freeScene(SceneInfo* scene)
 {
-    
+    freeIntersections(scene->intersectInfo);
 }
 
 void freeIntersections(IntersectionInfo* ii)
@@ -370,6 +352,7 @@ void illuminate(SceneInfo* scene)
         specularReflectVector = NULL;
         
         //fill pixel with rgb value at desired location
+        //glDrawPixels();
                    
     }
     
@@ -494,9 +477,18 @@ SceneInfo* loadScene(char* fname) {
 
     int noSpheres = 0;
     int noLights = 0;
-    int isSphere = 0; //flag for if we're reading a sphere
+    
 
     //read file character by character first to count the number of size
+    char c;
+    while((c = fgetc(fp)) != EOF){
+        
+        
+        if(strcmp(temp,"sphere") == 0)
+            noSpheres++;
+        else if(strcmp(temp,"light") == 0)
+            noLights++;
+    }
 
     //if string is "light" add to light counter, if sphere add to sphere counter
 
@@ -509,6 +501,23 @@ SceneInfo* loadScene(char* fname) {
 
     rewind(fp);
 
+    int lightCounter = 0;
+    int sphereCounter = 0;
+    int isSphere = 0; //flag for if we're reading a sphere
+    int isLight = 0;
+    while((c = fgetc(fp)) != EOF){
+        
+        if(isSphere == 1){
+            //read 7 values
+            scene->spheres[i] = readSphereLine(temp);
+        }
+        else if (isLight == 1){
+            //read 6 values
+            scene->light = readLightLine(temp);
+        }
+        isSphere = 0;
+        isLight = 0;
+    }
     //read file character by character again to get the values
     //if we detect sphere, flag sphere and read in 7 floats into a single temp string and send to function to create info
     //otherwise read in 6 floats into a single temp string and send to function to create info
