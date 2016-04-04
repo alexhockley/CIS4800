@@ -302,7 +302,7 @@ Point* calculateReflectionVector (Point* normal, Point* lightVector)
     r->x = lightVector->x - 2 * dot * normal->x;
     r->y = lightVector->y - 2 * dot * normal->y;
     r->y = lightVector->z - 2 * dot * normal->z;
-    
+    return r;
 }
 
 
@@ -351,8 +351,10 @@ void illuminate(SceneInfo* scene)
         free(specularReflectVector);
         specularReflectVector = NULL;
         
+        float pixel[3] = {r,g,b};
+        
         //fill pixel with rgb value at desired location
-        //glDrawPixels();
+        glDrawPixels(1, 1, GL_RGB, GL_UNSIGNED_CHAR, pixel);
                    
     }
     
@@ -483,11 +485,20 @@ SceneInfo* loadScene(char* fname) {
     char c;
     while((c = fgetc(fp)) != EOF){
         
-        
-        if(strcmp(temp,"sphere") == 0)
-            noSpheres++;
-        else if(strcmp(temp,"light") == 0)
-            noLights++;
+        if(c == '\n' || c == '\t' || c == ' '){ //if whitespace
+            if(strCnt > 0){
+                if(strcmp(temp,"sphere") == 0)
+                    noSpheres++;
+                else if(strcmp(temp,"light") == 0)
+                    noLights++;
+            }
+            strCnt = 0;
+            memset(temp,10000,'\0');
+        }
+        else{
+            temp[strCnt] = c;
+            strCnt++;
+        }
     }
 
     //if string is "light" add to light counter, if sphere add to sphere counter
@@ -501,22 +512,115 @@ SceneInfo* loadScene(char* fname) {
 
     rewind(fp);
 
-    int lightCounter = 0;
+    int tempCounter = 0;
     int sphereCounter = 0;
+    int lightCounter = 0;
+    int inVal = 0;
+    int strCnt = 0;
     int isSphere = 0; //flag for if we're reading a sphere
     int isLight = 0;
     while((c = fgetc(fp)) != EOF){
         
-        if(isSphere == 1){
-            //read 7 values
-            scene->spheres[i] = readSphereLine(temp);
+        if(c == '\n' || c == '\t' || c == ' '){ //if whitespace
+            if(strCnt > 0){
+                if(strcmp(temp,"sphere") == 0){
+                    
+                    while((c = fgetc(fp))!= EOF){
+                        if(c == '\n' || c == '\t' || c == ' '){
+                            if(strCnt > 0){
+                                switch(tempCounter){
+                                    case(0):
+                                        scene->spheres[sphereCounter] = (SphereInfo*)malloc(sizeof(SphereInfo));
+                                        scene->spheres[sphereCounter]->location = (Point*) malloc(sizeof(Point));
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->x);
+                                        break;
+                                    case(1):
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->y);
+                                        break;
+                                    case(2):
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->z);
+                                        break;
+                                    case(3):
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->radius);
+                                        break;
+                                    case(4):
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->r);
+                                        break;
+                                    case(5):
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->g);
+                                        break;
+                                    case(6):
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->b);
+                                        break;
+                                }
+                                tempCounter++;
+                            }
+                            strCnt = 0;
+                            memset(temp,10000,'\0');
+                        }
+                        else{
+                            temp[strCnt] = c;
+                            strCnt++;
+                        }
+                        if(tempCounter > 6){
+                            tempCounter = 0;
+                            sphereCounter++;
+                            break;
+                        }
+                    }
+                }
+                else if(strcmp(temp,"light") == 0){
+                    
+                    while((c = fgetc(fp))!= EOF){
+                        if(c == '\n' || c == '\t' || c == ' '){
+                            if(strCnt > 0){
+                                switch(tempCounter){
+                                    case(0):
+                                        scene->light = (LightInfo*)malloc(sizeof(LightInfo));
+                                        scene->light->location = (Point*) malloc(sizeof(Point));
+                                        sscanf(temp, "%f", &scene->light->location->x);
+                                        break;
+                                    case(1):
+                                        sscanf(temp, "%f", &scene->light->location->y);
+                                        break;
+                                    case(2):
+                                        sscanf(temp, "%f", &scene->light->location->z);
+                                        break;
+                                    case(3):
+                                        sscanf(temp, "%f", &scene->light->location->r);
+                                        break;
+                                    case(4):
+                                        sscanf(temp, "%f", &scene->light->location->g);
+                                        break;
+                                    case(5):
+                                        sscanf(temp, "%f", &scene->light->location->b);
+                                        break;
+                                }
+                                tempCounter++;
+                            }
+                            strCnt = 0;
+                            memset(temp,10000,'\0');
+                        }
+                        else{
+                            temp[strCnt] = c;
+                            strCnt++;
+                        }
+                        if(tempCounter > 5){
+                            tempCounter = 0;
+                            sphereCounter++;
+                            break;
+                        }
+                    }
+                }
+            }
+            tempCounter = 0;
+            strCnt = 0;
+            memset(temp,10000,'\0');
         }
-        else if (isLight == 1){
-            //read 6 values
-            scene->light = readLightLine(temp);
+        else{
+            temp[strCnt] = c;
+            strCnt++;
         }
-        isSphere = 0;
-        isLight = 0;
     }
     //read file character by character again to get the values
     //if we detect sphere, flag sphere and read in 7 floats into a single temp string and send to function to create info
@@ -527,22 +631,6 @@ SceneInfo* loadScene(char* fname) {
     fclose(fp);
 
     return scene;
-}
-
-LightInfo* readLightLine(char* line)
-{
-  LightInfo* li = (LightInfo*)malloc(sizeof(LightInfo));
-  li->location = (Point*) malloc(sizeof(Point));
-  sscanf(line, "%f %f %f %f %f %f", &li->location->x, &li->location->y, &li->location->z, &li->r, &li->g, &li->b);
-  return li;
-}
-
-SphereInfo* readSphereLine(char* line)
-{
-  SphereInfo* si = (SphereInfo*)malloc(sizeof(SphereInfo));
-  si->location = (Point*) malloc(sizeof(Point));
-  sscanf(line, "%f %f %f %f %f %f %f %f", &si->location->x, &si->location->y, &si->location->z, &si->radius, &si->r, &si->g, &si->b);
-  return si;
 }
 
 
