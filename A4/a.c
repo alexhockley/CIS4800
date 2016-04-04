@@ -29,6 +29,10 @@ float camX = 1;
 float camY = 2;
 float camZ = 1;
 
+float planeX = 0;
+float planeY = 0;
+float planeZ = 0;
+
 
 float viewX = 0;
 float viewY = 0;
@@ -62,6 +66,11 @@ float OsG = 1.0;
 float OsB = 1.0;
 float specN = 2.0;
 
+typedef struct Point{
+    float x;
+    float y;
+    float z;
+}Point;
 
 typedef struct Intersection{
   Point* in; //where the intersection goes into the object
@@ -72,27 +81,37 @@ typedef struct Intersection{
 }Intersection;
 
 typedef struct IntersectionInfo{
-  int numInterstections;
+  int numIntersections;
   Intersection** intersections;
 }IntersectionInfo;
 
 typedef struct RayInfo{
-  int totalRays = rtX*rtY;
+  int totalRays;
   int raysX = rtX;
   int raysY = rtY;
   Ray** rays;
 }RayInfo;
+
 
 typedef struct Ray{
   Point* origin;
   Point* direction;
 }Ray;
 
-typedef struct Point{
-  float x;
-  float y;
-  float z;
-}Point;
+typedef struct SphereInfo{
+    Point* location;
+    float radius;
+    float r;
+    float g;
+    float b;
+}SphereInfo;
+
+typedef struct LightInfo{
+    Point* location;
+    float r;
+    float g;
+    float b;
+}LightInfo;
 
 typedef struct SceneInfo{
   int numSpheres;
@@ -102,20 +121,9 @@ typedef struct SceneInfo{
   IntersectionInfo* intersectInfo;
 }SceneInfo;
 
-typedef struct LightInfo{
-  Point* location;
-  float r;
-  float g;
-  float b;
-}LightInfo;
 
-typedef struct SphereInfo{
-  Point* location;
-  float radius;
-  float r;
-  float g;
-  float b;
-}SphereInfo;
+
+
 
 SceneInfo* sceneInfo = NULL;
 
@@ -125,11 +133,6 @@ SceneInfo* sceneInfo = NULL;
 void init (void)
 {
    
-}
-
-void freeScene(SceneInfo* scene)
-{
-    freeIntersections(scene->intersectInfo);
 }
 
 void freeIntersections(IntersectionInfo* ii)
@@ -155,14 +158,19 @@ void freeIntersections(IntersectionInfo* ii)
     ii = NULL;
 }
 
-//calculate the length of a vector as defined by starting and destination points
-void calculateLength(float sX, float sY, float sZ, float dX, float dY, float dZ)
+void freeScene(SceneInfo* scene)
 {
-    return abs(sqrt(pow(dX-sX,2) + pow(dY-sY,2) + pow(dZ-sZ,2)));
+    freeIntersections(scene->intersectInfo);
+}
+
+//calculate the length of a vector as defined by starting and destination points
+float calculateLength(float sX, float sY, float sZ, float dX, float dY, float dZ)
+{
+    return fabs(sqrt(pow(dX-sX,2) + pow(dY-sY,2) + pow(dZ-sZ,2)));
 }
 
 //normalize a vector and return the points back into pointers supplied for fX, fY, fZ
-void normalize(float sX, float sY, float sZ, float dX, float dY, float dZ, float* fX, float* fY, float fZ)
+void normalize(float sX, float sY, float sZ, float dX, float dY, float dZ, float* fX, float* fY, float* fZ)
 {
   float length = calculateLength(sX, sY, sZ, dX, dY, dZ);
   *fX = (dX-sX) / length;
@@ -171,7 +179,7 @@ void normalize(float sX, float sY, float sZ, float dX, float dY, float dZ, float
 }
 
 //calculate the distance between two points
-void calcDistance(Point* origin, Point* destination)
+float calcDistance(Point* origin, Point* destination)
 {
   return sqrt(pow(destination->x - origin->x,2) + pow(destination->y - origin->y,2) + pow(destination->z - origin->z,2));
 }
@@ -179,28 +187,10 @@ void calcDistance(Point* origin, Point* destination)
 //calculate the dot product of two points
 float dotProduct(Point* p1, Point* p2)
 {
-    return (p1->x*p1->y + p1->y*p2->y + p3->z*p3->z);
+    return (p1->x*p1->y + p1->y*p2->y + p1->z*p2->z);
 }
 
-//calculate the intersections for each ray
-IntersectionInfo* calculateIntersections(SceneInfo* scene)
-{
-  IntersectionInfo* ii = (IntersectionInfo*)malloc(sizeof(IntersectionInfo));
-  ii->intersections = (Intersection**)malloc(sizeof(Intersection*)*ri->numRays);
-  ii->numIntersections = 0;
 
-  int intersectionNum = 0;
-    for(int i = 0; i < ri->totalRays; i++)
-    {
-        Intersection* inter = calculateIntersection(scene->spheres, scene->numSpheres, scene->rays[i]);
-        if(inter != NULL){
-            ii->intersections[intersectionNum] = inter;
-            ii->numIntersections++;
-            intersectionNum++;
-        }
-    }
-    return ii;
-}
 
 //calculate the intersection of a ray and the spheres
 Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
@@ -208,9 +198,9 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
 
   Intersection* inter = NULL;
 
-  float A = 0,B = 0,C = 0,To = 0,Td = 0;
+  float A = 0,B = 0,C = 0,To = 0,Tf = 0;
 
-  float At = 0,Bt = 0,Ct = 0,Tot = 0, Tdt = 0;
+  float At = 0,Bt = 0,Ct = 0,Tot = 0, Tft = 0;
   Point* tempPoint = (Point*)malloc(sizeof(Point));
   int flag = 0, firstFlag = 1;
   int sphereNum = -1;
@@ -242,7 +232,7 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
 
     //check it is closer to the camera than the last intersection if it is, replace the A B C To Td values with the last calculated ones and continue
     tempDistance = calcDistance(tempPoint, ray->origin);
-    if(firstFlag == 1 || abs(tempDistance) < abs(lastDistance)){
+    if(firstFlag == 1 || fabsf(tempDistance) < fabsf(lastDistance)){
       firstFlag = 0;
       B = Bt;
       C = Ct;
@@ -256,7 +246,7 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
   //we had an intersection
   if(flag == 1){
     //allocate memory and assign values of the intersection
-    inter = (Intersection*) malloc(sizeof(Intersection))
+    inter = (Intersection*) malloc(sizeof(Intersection));
       
     //entry intersection point
     inter->in = (Point*)malloc(sizeof(Point));
@@ -290,6 +280,26 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
   return inter;
 }
 
+//calculate the intersections for each ray
+IntersectionInfo* calculateIntersections(SceneInfo* scene)
+{
+    IntersectionInfo* ii = (IntersectionInfo*)malloc(sizeof(IntersectionInfo));
+    ii->intersections = (Intersection**)malloc(sizeof(Intersection*)*scene->rays->totalRays);
+    ii->numIntersections = 0;
+    
+    int intersectionNum = 0;
+    for(int i = 0; i < scene->rays->totalRays; i++)
+    {
+        Intersection* inter = calculateIntersection(scene->spheres, scene->numSpheres, scene->rays[i]);
+        if(inter != NULL){
+            ii->intersections[intersectionNum] = inter;
+            ii->numIntersections++;
+            intersectionNum++;
+        }
+    }
+    return ii;
+}
+
 Point* calculateReflectionVector (Point* normal, Point* lightVector)
 {
     Point* r = (Point*)malloc(sizeof(Point));
@@ -320,13 +330,13 @@ void illuminate(SceneInfo* scene)
         //calculate the vectors
         //diffuse
         normalize(scene->intersectInfo->intersections[i]->in->x, scene->intersectInfo->intersections[i]->in->y, scene->intersectInfo->intersections[i]->in->z,
-                  sceneInfo->light->x, sceneInfo->light->y, sceneInfo->light->z,
+                  sceneInfo->light->location->x, sceneInfo->light->location->y, sceneInfo->light->location->z,
                   &diffuseLightVector->x, &diffuseLightVector->y, &diffuseLightVector->z);
         
         //specular view
         normalize(scene->intersectInfo->intersections[i]->in->x, scene->intersectInfo->intersections[i]->in->y, scene->intersectInfo->intersections[i]->in->z,
                   camX, camY, camZ,
-                  &speculuarViewVector->x, &specularViewVector->y, &specularViewVector->z);
+                  &specularViewVector->x, &specularViewVector->y, &specularViewVector->z);
         
         //specular reflection
         specularReflectVector = calculateReflectionVector(scene->intersectInfo->intersections[i]->normalIn, scene->light);
@@ -334,18 +344,18 @@ void illuminate(SceneInfo* scene)
         //calculate r ambient, diffuse and specular combination colour
         r = IaR * Ka * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->r +
             IpR * (Kd * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->r * dotProduct(scene->intersectInfo->intersections[i]->normalIn, diffuseLightVector) +
-                   Ks * KsR * pow(dotProduct(specularReflectVector, specularViewVector), specN));
+                   Ks * scene->light->r * pow(dotProduct(specularReflectVector, specularViewVector), specN));
         
         //calculate g ambient, diffuse and
         g = IaG * Ka * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->g +
             IpG * (Kd * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->g * dotProduct(scene->intersectInfo->intersections[i]->normalIn, diffuseLightVector) +
-                   Ks * KsG * pow(dotProduct(specularReflectVector, specularViewVector), specN));
+                   Ks * scene->light->g * pow(dotProduct(specularReflectVector, specularViewVector), specN));
 
         
         //calculate b
         b = IaB * Ka * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->b +
             IpB * (Kd * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->b * dotProduct(scene->intersectInfo->intersections[i]->normalIn, diffuseLightVector) +
-                   Ks * KsB * pow(dotProduct(specularReflectVector, specularViewVector),specN));
+                   Ks * scene->light->b * pow(dotProduct(specularReflectVector, specularViewVector),specN));
 
         
         free(specularReflectVector);
@@ -354,7 +364,7 @@ void illuminate(SceneInfo* scene)
         float pixel[3] = {r,g,b};
         
         //fill pixel with rgb value at desired location
-        glDrawPixels(1, 1, GL_RGB, GL_UNSIGNED_CHAR, pixel);
+        glDrawPixels(1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
                    
     }
     
@@ -398,8 +408,9 @@ void setupDirectionVectors(RayInfo* ri)
 RayInfo* calculateRays(SceneInfo* scene)
 {
     RayInfo* rays = (RayInfo*)malloc(sizeof(RayInfo));
-    rays->rays = (Ray**)malloc(sizeof(Ray*)*rays->numRays);
-    for(int i = 0; i < rays->numRays; i++){
+    rays->totalRays = rtX*rtY;
+    rays->rays = (Ray**)malloc(sizeof(Ray*)*rays->totalRays);
+    for(int i = 0; i < rays->totalRays; i++){
         rays->rays[i] = (Ray*)malloc(sizeof(Ray));
         rays->rays[i]->origin = (Point*)malloc(sizeof(Point));
         rays->rays[i]->direction = (Point*)malloc(sizeof(Point));
@@ -479,6 +490,7 @@ SceneInfo* loadScene(char* fname) {
 
     int noSpheres = 0;
     int noLights = 0;
+    int strCnt = 0;
     
 
     //read file character by character first to count the number of size
@@ -500,6 +512,8 @@ SceneInfo* loadScene(char* fname) {
             strCnt++;
         }
     }
+    strCnt = 0;
+    memset(temp,10000,'\0');
 
     //if string is "light" add to light counter, if sphere add to sphere counter
 
@@ -516,7 +530,7 @@ SceneInfo* loadScene(char* fname) {
     int sphereCounter = 0;
     int lightCounter = 0;
     int inVal = 0;
-    int strCnt = 0;
+    
     int isSphere = 0; //flag for if we're reading a sphere
     int isLight = 0;
     while((c = fgetc(fp)) != EOF){
@@ -541,16 +555,16 @@ SceneInfo* loadScene(char* fname) {
                                         sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->z);
                                         break;
                                     case(3):
-                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->radius);
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->radius);
                                         break;
                                     case(4):
-                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->r);
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->r);
                                         break;
                                     case(5):
-                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->g);
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->g);
                                         break;
                                     case(6):
-                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->location->b);
+                                        sscanf(temp, "%f", &scene->spheres[sphereCounter]->b);
                                         break;
                                 }
                                 tempCounter++;
@@ -587,13 +601,13 @@ SceneInfo* loadScene(char* fname) {
                                         sscanf(temp, "%f", &scene->light->location->z);
                                         break;
                                     case(3):
-                                        sscanf(temp, "%f", &scene->light->location->r);
+                                        sscanf(temp, "%f", &scene->light->r);
                                         break;
                                     case(4):
-                                        sscanf(temp, "%f", &scene->light->location->g);
+                                        sscanf(temp, "%f", &scene->light->g);
                                         break;
                                     case(5):
-                                        sscanf(temp, "%f", &scene->light->location->b);
+                                        sscanf(temp, "%f", &scene->light->b);
                                         break;
                                 }
                                 tempCounter++;
@@ -622,12 +636,6 @@ SceneInfo* loadScene(char* fname) {
             strCnt++;
         }
     }
-    //read file character by character again to get the values
-    //if we detect sphere, flag sphere and read in 7 floats into a single temp string and send to function to create info
-    //otherwise read in 6 floats into a single temp string and send to function to create info
-    //if we hit the EOF or a non-alphabetic character before expected, fatal error
-    //if we have extra numbers at the end, fatal error
-
     fclose(fp);
 
     return scene;
@@ -637,13 +645,15 @@ SceneInfo* loadScene(char* fname) {
 RayInfo* allocateRays(LightInfo* li)
 {
   RayInfo* ri = (RayInfo*)malloc(sizeof(RayInfo));
-  ri->rays = (Ray**)malloc(sizeof(Ray*)*ri->numRays);
+  ri->totalRays = rtX*rtY;
+  ri->rays = (Ray**)malloc(sizeof(Ray*)*ri->totalRays);
 
-  for(int i = 0; i < ri->numRays; i++){
+  for(int i = 0; i < ri->totalRays; i++){
     ri->rays[i] = (Ray*) malloc(sizeof(Ray));
     ri->rays[i]->location = (Point*) malloc(sizeof(Point));
     ri->rays[i]->direction = (Point*) malloc(sizeof(Point));
   }
+    return ri;
 }
 
 /*  Main Loop
@@ -659,7 +669,7 @@ int main(int argc, char** argv)
 
    sceneInfo = loadScene(argv[1]);
    sceneInfo->rays = calculateRays(sceneInfo);
-   sceneInfo->intersectionInfo = calculateIntersections(sceneInfo);
+   sceneInfo->intersectInfo = calculateIntersections(sceneInfo);
 
    init();
    glutReshapeFunc (reshape);
