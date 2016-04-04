@@ -85,18 +85,22 @@ typedef struct IntersectionInfo{
   Intersection** intersections;
 }IntersectionInfo;
 
+
+typedef struct Ray{
+    Point* origin;
+    Point* direction;
+}Ray;
+
+
 typedef struct RayInfo{
   int totalRays;
-  int raysX = rtX;
-  int raysY = rtY;
+  int raysX;
+  int raysY;
   Ray** rays;
 }RayInfo;
 
 
-typedef struct Ray{
-  Point* origin;
-  Point* direction;
-}Ray;
+
 
 typedef struct SphereInfo{
     Point* location;
@@ -210,12 +214,12 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
 
   //for each sphere, calculate the different components and store them in a temporary variable
   for(int i = 0; i < n; i++){
-    Bt = 2*(ray->direction->point->x * (ray->origin->point->x * spheres[i]->location->x) +
-           ray->direction->point->y * (ray->origin->point->y * spheres[i]->location->y) +
-           ray->direction->point->z * (ray->origin->point->z * spheres[i]->location->z));
-    Ct = pow((ray->origin->point->x - spheres[i]->location->x),2) +
-        pow((ray->origin->point->y - spheres[i]->location->y),2) +
-        pow((ray->origin->point->z - spheres[i]->location->z),2) - pow(spheres[i]->radius,2);
+    Bt = 2*(ray->direction->x * (ray->origin->x * spheres[i]->location->x) +
+           ray->direction->y * (ray->origin->y * spheres[i]->location->y) +
+           ray->direction->z * (ray->origin->z * spheres[i]->location->z));
+    Ct = pow((ray->origin->x - spheres[i]->location->x),2) +
+        pow((ray->origin->y - spheres[i]->location->y),2) +
+        pow((ray->origin->z - spheres[i]->location->z),2) - pow(spheres[i]->radius,2);
 
     if((pow(Bt,2)-4*Ct) == 0) //no intersections
       continue;
@@ -290,7 +294,7 @@ IntersectionInfo* calculateIntersections(SceneInfo* scene)
     int intersectionNum = 0;
     for(int i = 0; i < scene->rays->totalRays; i++)
     {
-        Intersection* inter = calculateIntersection(scene->spheres, scene->numSpheres, scene->rays[i]);
+        Intersection* inter = calculateIntersection(scene->spheres, scene->numSpheres, scene->rays->rays[i]);
         if(inter != NULL){
             ii->intersections[intersectionNum] = inter;
             ii->numIntersections++;
@@ -409,6 +413,8 @@ RayInfo* calculateRays(SceneInfo* scene)
 {
     RayInfo* rays = (RayInfo*)malloc(sizeof(RayInfo));
     rays->totalRays = rtX*rtY;
+    rays->raysX = rtX;
+    rays->raysY = rtY;
     rays->rays = (Ray**)malloc(sizeof(Ray*)*rays->totalRays);
     for(int i = 0; i < rays->totalRays; i++){
         rays->rays[i] = (Ray*)malloc(sizeof(Ray));
