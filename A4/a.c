@@ -25,16 +25,16 @@
 
 
 //location data for the camera
-float camX = 1;
-float camY = 2;
-float camZ = 1;
+float camX = 0;
+float camY = 0;
+float camZ = 0;
 
 float planeX = 0;
 float planeY = 0;
 float planeZ = 0;
 
 
-float viewX = 0;
+float viewX = -1;
 float viewY = 0;
 float viewZ = 0;
 float viewWidth = 500;
@@ -126,9 +126,6 @@ typedef struct SceneInfo{
 }SceneInfo;
 
 
-
-
-
 SceneInfo* sceneInfo = NULL;
 
 
@@ -211,31 +208,46 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
 
   float lastDistance = 0, tempDistance = 0;
 
-
+    //printf("Ray direction: [%f %f %f]\n", ray->direction->x, ray->direction->y, ray->direction->z);
+    //printf("Ray origin: [%f %f %f]\n", ray->origin->x, ray->origin->y, ray->origin->z);
+    
   //for each sphere, calculate the different components and store them in a temporary variable
   for(int i = 0; i < n; i++){
-    Bt = 2*(ray->direction->x * (ray->origin->x * spheres[i]->location->x) +
-           ray->direction->y * (ray->origin->y * spheres[i]->location->y) +
-           ray->direction->z * (ray->origin->z * spheres[i]->location->z));
+      //printf("Sphere location [%f %f %f]\n", spheres[i]->location->x, spheres[i]->location->y, spheres[i]->location->z);
+    Bt = 2*(ray->direction->x * (ray->origin->x - spheres[i]->location->x) +
+           ray->direction->y * (ray->origin->y - spheres[i]->location->y) +
+           ray->direction->z * (ray->origin->z - spheres[i]->location->z));
     Ct = pow((ray->origin->x - spheres[i]->location->x),2) +
         pow((ray->origin->y - spheres[i]->location->y),2) +
         pow((ray->origin->z - spheres[i]->location->z),2) - pow(spheres[i]->radius,2);
 
-    if((pow(Bt,2)-4*Ct) == 0) //no intersections
+      //printf("B: %f\n", Bt);
+      //printf("C: %f\n", Ct);
+      
+    if((pow(Bt,2)-4*Ct) < 0){ //no intersections
+      printf("No intersection\n");
       continue;
+    }
     flag = 1;
       
     //determine the entry and exit t values using the quadratic formula
-    Tot = -Bt - (sqrt(pow(Bt,2) - (4*Ct) )) / 2;
-    Tft = -Bt + (sqrt(pow(Bt,2) - (4*Ct) )) / 2;
-
+    Tot = (-Bt - (sqrt(fabs(pow(Bt,2) - (4.0*Ct) )))) / 2.0;
+    Tft = (-Bt + (sqrt(fabs(pow(Bt,2) - (4.0*Ct) )))) / 2.0;
+      
+      //printf("T0 %f\n", Tot);
+      //printf("T1 %f\n", Tft);
+      
     //calculate the point of the entry in the world
     tempPoint->x = ray->origin->x + ray->direction->x*Tot;
     tempPoint->y = ray->origin->y + ray->direction->y*Tot;
     tempPoint->z = ray->origin->z + ray->direction->z*Tot;
+      
+      //printf("TempPoint: [%f %f %f]\n", tempPoint->x, tempPoint->y, tempPoint->z);
 
     //check it is closer to the camera than the last intersection if it is, replace the A B C To Td values with the last calculated ones and continue
     tempDistance = calcDistance(tempPoint, ray->origin);
+      //printf("Distance: %f\n",tempDistance);
+      //exit(1);
     if(firstFlag == 1 || fabsf(tempDistance) < fabsf(lastDistance)){
       firstFlag = 0;
       B = Bt;
@@ -287,10 +299,11 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
 //calculate the intersections for each ray
 IntersectionInfo* calculateIntersections(SceneInfo* scene)
 {
+    printf("Calculating intersections\n");
     IntersectionInfo* ii = (IntersectionInfo*)malloc(sizeof(IntersectionInfo));
     ii->intersections = (Intersection**)malloc(sizeof(Intersection*)*scene->rays->totalRays);
     ii->numIntersections = 0;
-    
+    printf("Created interesction info\n");
     int intersectionNum = 0;
     for(int i = 0; i < scene->rays->totalRays; i++)
     {
@@ -301,6 +314,7 @@ IntersectionInfo* calculateIntersections(SceneInfo* scene)
             intersectionNum++;
         }
     }
+    printf("Number intersecitons: %d\n", intersectionNum);
     return ii;
 }
 
@@ -311,11 +325,16 @@ Point* calculateReflectionVector (Point* normal, Point* lightVector)
     
     /*angle = acos(dotProduct(normal,lightVector) / (calculateLength(intersection->x, intersection->y, intersection->z, normal->x, normal->y, normal->z) * calculateLength(intersection->x, intersection->y, intersection->z, lightVector->x, lightVector->y, lightVector->z));*/
     
+    //printf("normal [%f %f %f]\n", normal->x, normal->y, normal->z);
+    //printf("lightvector [%f %f %f]\n", lightVector->x, lightVector->y, lightVector->z);
+    
     float dot = dotProduct(lightVector, normal);
     
-    r->x = lightVector->x - 2 * dot * normal->x;
-    r->y = lightVector->y - 2 * dot * normal->y;
-    r->y = lightVector->z - 2 * dot * normal->z;
+    r->x = lightVector->x - ((2 * dot) * normal->x);
+    r->y = lightVector->y - ((2 * dot) * normal->y);
+    r->z = lightVector->z - ((2 * dot) * normal->z);
+    
+    //printf("Reflection vector: [%f %f %f]\n", r->x, r->y, r->z);
     return r;
 }
 
@@ -343,7 +362,7 @@ void illuminate(SceneInfo* scene)
                   &specularViewVector->x, &specularViewVector->y, &specularViewVector->z);
         
         //specular reflection
-        specularReflectVector = calculateReflectionVector(scene->intersectInfo->intersections[i]->normalIn, scene->light);
+        specularReflectVector = calculateReflectionVector(scene->intersectInfo->intersections[i]->normalIn, scene->light->location);
         
         //calculate r ambient, diffuse and specular combination colour
         r = IaR * Ka * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->r +
@@ -366,6 +385,7 @@ void illuminate(SceneInfo* scene)
         specularReflectVector = NULL;
         
         float pixel[3] = {r,g,b};
+        printf("%f %f %f\n", r,g,b);
         
         //fill pixel with rgb value at desired location
         glDrawPixels(1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
@@ -388,9 +408,10 @@ void drawScene(SceneInfo* scene)
 void setupOriginVectors(RayInfo* ri)
 {
   for(int i = 0; i < ri->totalRays; i++){
-    ri->rays[i]->origin->point->x = camX;
-    ri->rays[i]->origin->point->y = camY;
-    ri->rays[i]->origin->point->z = camZ;
+    ri->rays[i]->origin->x = camX;
+    ri->rays[i]->origin->y = camY;
+    ri->rays[i]->origin->z = camZ;
+      
   }
 }
 
@@ -401,9 +422,10 @@ void setupDirectionVectors(RayInfo* ri)
   int curRay = 0;
   for(int i = 0; i < ri->raysX; i++){
     for(int j = 0; j < ri->raysY; j++){
-      normalize(ri->rays[curRay]->origin->point->x, ri->rays[curRay]->origin->point->y, ri->rays[curRay]->origin->point->z,
+      normalize(ri->rays[curRay]->origin->x, ri->rays[curRay]->origin->y, ri->rays[curRay]->origin->z,
                 incX*i + planeX, incY*j + planeY, planeZ,
-                &ri->rays[curRay]->direction->point->x, &ri->rays[curRay]->direction->point->y, &ri->rays[curRay]->direction->point->z);
+                &ri->rays[curRay]->direction->x, &ri->rays[curRay]->direction->y, &ri->rays[curRay]->direction->z);
+        
       curRay++;
     }
   }
@@ -484,7 +506,7 @@ void keyboard(unsigned char key, int x, int y)
 
 //reads the map from file
 SceneInfo* loadScene(char* fname) {
-    printf("Loading shapes\n");
+    printf("Loading scene\n");
     FILE *fp;
     char instr[10000];
     char temp[10000];
@@ -511,7 +533,7 @@ SceneInfo* loadScene(char* fname) {
                     noLights++;
             }
             strCnt = 0;
-            memset(temp,10000,'\0');
+            memset(temp,'\0',10000);
         }
         else{
             temp[strCnt] = c;
@@ -519,8 +541,10 @@ SceneInfo* loadScene(char* fname) {
         }
     }
     strCnt = 0;
-    memset(temp,10000,'\0');
+    memset(temp,'\0',10000);
 
+    printf("%d spheres\n", noSpheres);
+    printf("%d lights\n", noLights);
     //if string is "light" add to light counter, if sphere add to sphere counter
 
     SceneInfo* scene = (SceneInfo*) malloc(sizeof(SceneInfo));
@@ -544,9 +568,10 @@ SceneInfo* loadScene(char* fname) {
         if(c == '\n' || c == '\t' || c == ' '){ //if whitespace
             if(strCnt > 0){
                 if(strcmp(temp,"sphere") == 0){
-                    
-                    while((c = fgetc(fp))!= EOF){
-                        if(c == '\n' || c == '\t' || c == ' '){
+                    strCnt = 0;
+                    memset(temp,'\0',10000);
+                    while((c = fgetc(fp))){
+                        if(c == '\n' || c == '\t' || c == ' ' || c == EOF){
                             if(strCnt > 0){
                                 switch(tempCounter){
                                     case(0):
@@ -576,7 +601,7 @@ SceneInfo* loadScene(char* fname) {
                                 tempCounter++;
                             }
                             strCnt = 0;
-                            memset(temp,10000,'\0');
+                            memset(temp,'\0',10000);
                         }
                         else{
                             temp[strCnt] = c;
@@ -590,9 +615,10 @@ SceneInfo* loadScene(char* fname) {
                     }
                 }
                 else if(strcmp(temp,"light") == 0){
-                    
-                    while((c = fgetc(fp))!= EOF){
-                        if(c == '\n' || c == '\t' || c == ' '){
+                    strCnt = 0;
+                    memset(temp,'\0',10000);
+                    while((c = fgetc(fp))){
+                        if(c == '\n' || c == '\t' || c == ' ' || c == EOF){
                             if(strCnt > 0){
                                 switch(tempCounter){
                                     case(0):
@@ -619,7 +645,7 @@ SceneInfo* loadScene(char* fname) {
                                 tempCounter++;
                             }
                             strCnt = 0;
-                            memset(temp,10000,'\0');
+                            memset(temp,'\0',10000);
                         }
                         else{
                             temp[strCnt] = c;
@@ -627,7 +653,7 @@ SceneInfo* loadScene(char* fname) {
                         }
                         if(tempCounter > 5){
                             tempCounter = 0;
-                            sphereCounter++;
+                            lightCounter++;
                             break;
                         }
                     }
@@ -635,7 +661,7 @@ SceneInfo* loadScene(char* fname) {
             }
             tempCounter = 0;
             strCnt = 0;
-            memset(temp,10000,'\0');
+            memset(temp,'\0',10000);
         }
         else{
             temp[strCnt] = c;
@@ -643,24 +669,9 @@ SceneInfo* loadScene(char* fname) {
         }
     }
     fclose(fp);
-
     return scene;
 }
 
-
-RayInfo* allocateRays(LightInfo* li)
-{
-  RayInfo* ri = (RayInfo*)malloc(sizeof(RayInfo));
-  ri->totalRays = rtX*rtY;
-  ri->rays = (Ray**)malloc(sizeof(Ray*)*ri->totalRays);
-
-  for(int i = 0; i < ri->totalRays; i++){
-    ri->rays[i] = (Ray*) malloc(sizeof(Ray));
-    ri->rays[i]->location = (Point*) malloc(sizeof(Point));
-    ri->rays[i]->direction = (Point*) malloc(sizeof(Point));
-  }
-    return ri;
-}
 
 /*  Main Loop
  *  Open window with initial window size, title bar,
@@ -674,9 +685,11 @@ int main(int argc, char** argv)
    glutCreateWindow (argv[0]);
 
    sceneInfo = loadScene(argv[1]);
+    printf("x: %f\n", sceneInfo->spheres[0]->location->x);
+    
    sceneInfo->rays = calculateRays(sceneInfo);
+    
    sceneInfo->intersectInfo = calculateIntersections(sceneInfo);
-
    init();
    glutReshapeFunc (reshape);
    glutDisplayFunc(display);
