@@ -1,0 +1,19 @@
+Alex Hockley
+0758114
+
+CIS4800
+Assignment 4
+Ray Tracing
+
+Setup:
+Extract archive and type make
+
+run ./a <filename>
+
+I have provided a test file which showcases 3 spheres of varying sizes and some overlap between two of them.
+
+
+Deficiencies:
+- Specular Lighting is not implemented (it was causing some pretty wonky stuff)
+- Shadows are not implemented
+- Persective ray tracing not implemented, its dumb straight-on tracing
