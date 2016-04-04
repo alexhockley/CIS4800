@@ -29,16 +29,11 @@ float camX = 0;
 float camY = 0;
 float camZ = 0;
 
-float planeX = 0;
-float planeY = 0;
-float planeZ = 0;
-
-
-float viewX = -1;
+float viewX = 0;
 float viewY = 0;
-float viewZ = 0;
-float viewWidth = 500;
-float viewHeight = 500;
+float viewZ = -1;
+float viewWidth = 2;
+float viewHeight = 2;
 
 int rtX = 1024;
 int rtY = 768;
@@ -65,6 +60,8 @@ float OsR = 1.0;
 float OsG = 1.0;
 float OsB = 1.0;
 float specN = 2.0;
+
+GLubyte pixbuff[1024][768][3];
 
 typedef struct Point{
     float x;
@@ -225,7 +222,7 @@ Intersection* calculateIntersection(SphereInfo** spheres, int n, Ray* ray)
       //printf("C: %f\n", Ct);
       
     if((pow(Bt,2)-4*Ct) < 0){ //no intersections
-      printf("No intersection\n");
+      //printf("No intersection\n");
       continue;
     }
     flag = 1;
@@ -305,14 +302,22 @@ IntersectionInfo* calculateIntersections(SceneInfo* scene)
     ii->numIntersections = 0;
     printf("Created interesction info\n");
     int intersectionNum = 0;
-    for(int i = 0; i < scene->rays->totalRays; i++)
+    int curRay = 0;
+    for(int i = 0; i < scene->rays->rtX; i++)
     {
-        Intersection* inter = calculateIntersection(scene->spheres, scene->numSpheres, scene->rays->rays[i]);
-        if(inter != NULL){
-            ii->intersections[intersectionNum] = inter;
-            ii->numIntersections++;
-            intersectionNum++;
+        for(int j = 0; j < scene->rays->rtY; j++){
+            Intersection* inter = calculateIntersection(scene->spheres, scene->numSpheres, scene->rays->rays[curRay]);
+            pixbuff[i][j] = {0,0,0};
+            if(inter != NULL){
+                ii->intersections[intersectionNum] = inter;
+                ii->numIntersections++;
+                intersectionNum++;
+                pixbuff[i][j] = generatePixelValue(scene, inter);
+            }
+            curRay++;
         }
+        
+        
     }
     printf("Number intersecitons: %d\n", intersectionNum);
     return ii;
@@ -339,7 +344,7 @@ Point* calculateReflectionVector (Point* normal, Point* lightVector)
 }
 
 
-void illuminate(SceneInfo* scene)
+void generatePixelValue(SceneInfo* scene)
 {
     float r, g ,b;
     Point* diffuseLightVector = (Point*)malloc(sizeof(Point));
@@ -355,14 +360,16 @@ void illuminate(SceneInfo* scene)
         normalize(scene->intersectInfo->intersections[i]->in->x, scene->intersectInfo->intersections[i]->in->y, scene->intersectInfo->intersections[i]->in->z,
                   sceneInfo->light->location->x, sceneInfo->light->location->y, sceneInfo->light->location->z,
                   &diffuseLightVector->x, &diffuseLightVector->y, &diffuseLightVector->z);
-        
+        //printf("light vector: [%f %f %f]\n", diffuseLightVector->x, diffuseLightVector->y, diffuseLightVector->z);
         //specular view
         normalize(scene->intersectInfo->intersections[i]->in->x, scene->intersectInfo->intersections[i]->in->y, scene->intersectInfo->intersections[i]->in->z,
                   camX, camY, camZ,
                   &specularViewVector->x, &specularViewVector->y, &specularViewVector->z);
+        //printf("specular vector: [%f %f %f]\n", specularViewVector->x, specularViewVector->y, specularViewVector->z);
         
         //specular reflection
         specularReflectVector = calculateReflectionVector(scene->intersectInfo->intersections[i]->normalIn, scene->light->location);
+        //printf("reflect vector: [%f %f %f]\n", specularReflectVector->x, specularReflectVector->y, specularReflectVector->z);
         
         //calculate r ambient, diffuse and specular combination colour
         r = IaR * Ka * scene->spheres[scene->intersectInfo->intersections[i]->sphereNum]->r +
@@ -381,14 +388,15 @@ void illuminate(SceneInfo* scene)
                    Ks * scene->light->b * pow(dotProduct(specularReflectVector, specularViewVector),specN));
 
         
+        
         free(specularReflectVector);
         specularReflectVector = NULL;
         
-        float pixel[3] = {r,g,b};
+        Glubyte pixel[3] = {r,g,b};
         printf("%f %f %f\n", r,g,b);
         
         //fill pixel with rgb value at desired location
-        glDrawPixels(1, 1, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+        
                    
     }
     
@@ -400,18 +408,22 @@ void illuminate(SceneInfo* scene)
     
 }
 
-void drawScene(SceneInfo* scene)
+void drawScene()
 {
-    illuminate(scene);
+    glDrawPixels(1024, 768, GL_RGB, GL_UNSIGNED_BYTE, pixbuff);
 }
 
 void setupOriginVectors(RayInfo* ri)
 {
-  for(int i = 0; i < ri->totalRays; i++){
-    ri->rays[i]->origin->x = camX;
-    ri->rays[i]->origin->y = camY;
-    ri->rays[i]->origin->z = camZ;
-      
+    int curRay = 0;
+  for(int i = 0; i < ri->raysX; i++){
+      for(int j = 0; j < ri->raysY; j++){
+          ri->rays[curRay]->origin->x = camX - (viewWidth/2.0) + i*(viewWidth/rtX);
+          ri->rays[curRay]->origin->y = camY - (viewHeight/2.0) + j*(viewHeight/rtY);
+          ri->rays[curRay]->origin->z = camZ;
+          //printf("Ray origin: [%f %f %f]\n", ri->rays[curRay]->origin->x, ri->rays[curRay]->origin->y, ri->rays[curRay]->origin->z);
+          curRay++;
+      }
   }
 }
 
@@ -422,10 +434,9 @@ void setupDirectionVectors(RayInfo* ri)
   int curRay = 0;
   for(int i = 0; i < ri->raysX; i++){
     for(int j = 0; j < ri->raysY; j++){
-      normalize(ri->rays[curRay]->origin->x, ri->rays[curRay]->origin->y, ri->rays[curRay]->origin->z,
-                incX*i + planeX, incY*j + planeY, planeZ,
-                &ri->rays[curRay]->direction->x, &ri->rays[curRay]->direction->y, &ri->rays[curRay]->direction->z);
-        
+        ri->rays[curRay]->direction->x = 0;
+        ri->rays[curRay]->direction->y = 0;
+        ri->rays[curRay]->direction->z = 1;
       curRay++;
     }
   }
@@ -461,9 +472,6 @@ void display (void)
 
     /* set starting location of objects */
     glPushMatrix ();
-    gluLookAt(camX, camY, camZ,
-              0, 0, 0,
-              0, 1, 0);
 
 
     drawScene(sceneInfo);
@@ -685,7 +693,6 @@ int main(int argc, char** argv)
    glutCreateWindow (argv[0]);
 
    sceneInfo = loadScene(argv[1]);
-    printf("x: %f\n", sceneInfo->spheres[0]->location->x);
     
    sceneInfo->rays = calculateRays(sceneInfo);
     
